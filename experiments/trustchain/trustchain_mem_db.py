@@ -39,6 +39,7 @@ class TrustchainMemoryDatabase(object):
                 
         self.total_spend_sum = {}
         self.total_claim_sum = {}
+        self.confirmed_seq_num = {}
 
     def key_to_id(self, key):
         return str(hexlify(key)[-KEY_LEN:])[2:-1]
@@ -216,10 +217,14 @@ class TrustchainMemoryDatabase(object):
 
     def get_known_chains(self, peer_id):
         return (k[0] for k in self.get_peer_chain(peer_id))
+    
+    def get_last_confirmed_seq_num(self, peer_id):
+        return self.confirmed_seq_num[peer_id] if peer_id in self.confirmed_seq_num else 0
 
     def add_peer_proofs(self, peer_id, seq_num, status, proofs):
         if peer_id not in self.claim_proofs or self.claim_proofs[peer_id][0] < seq_num:
             self.claim_proofs[peer_id] = (seq_num, status, proofs)
+            self.confirmed_seq_num[peer_id] = seq_num
 
     def get_peer_proofs(self, peer_id, seq_num):
         if peer_id not in self.claim_proofs or seq_num > self.claim_proofs[peer_id][0]:
@@ -258,6 +263,7 @@ class TrustchainMemoryDatabase(object):
                                      total_spend=float(v),
                                      verified=True,
                                      claim_num=status['seq_num'])
+        self.confirmed_seq_num[peer_id] = status['seq_num']
         self.update_chain_dependency(peer_id)
         return True
 
