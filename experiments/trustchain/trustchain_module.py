@@ -258,7 +258,8 @@ class TrustchainModule(IPv8OverlayExperimentModule):
             self.tx_lc.start(1.0 / individual_tx_rate)
 
         my_peer_id = self.experiment.scenario_runner._peernumber
-        deferLater(reactor, (1.0 / total_peers) * (my_peer_id - 1), start_lc)
+        delay = 1*random()
+        deferLater(reactor, delay, start_lc)
 
     @experiment_callback
     def stop_creating_transactions(self):
