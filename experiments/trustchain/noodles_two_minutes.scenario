@@ -10,12 +10,13 @@
 @0:9 disable_max_peers
 @0:10 set_validation_range 5
 @0:12 introduce_community_topology
-@0:18 mint
-@0:20 minter_send_to_all
-@0:30 start_creating_transactions
-@0:31 start_periodic_mem_flush
-@0:90 stop_creating_transactions
-@0:95 commit_block_times
-@0:100 write_overlay_statistics
-@0:110 stop_session
-@0:120 stop
+@0:23 recheck_connections
+@0:25 mint
+@0:27 minter_send_to_all
+@0:40 start_creating_transactions
+@0:41 start_periodic_mem_flush
+@0:100 stop_creating_transactions
+@0:105 commit_block_times
+@0:110 write_overlay_statistics
+@0:120 stop_session
+@0:130 stop

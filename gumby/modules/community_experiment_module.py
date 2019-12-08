@@ -128,7 +128,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         for m in range(1, num_minters + 1):
             topology.add_node(int(m), minter=True)
             for k in self.all_vars.keys():
-                if k != m:
+                if int(k) != int(m):
                     topology.add_edge(int(m), int(k))
         self.build_network(topology)
 

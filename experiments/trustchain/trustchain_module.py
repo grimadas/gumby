@@ -219,15 +219,17 @@ class TrustchainModule(IPv8OverlayExperimentModule):
         if not self.is_minter():
             return
 
-        self._logger.info("Sending initial value to all peers...")
         mint_val = 100000
         if os.getenv('INIT_MINT'):
             mint_val = float(os.getenv('INIT_MINT'))
 
         peers = self.overlay.get_all_communities_peers()
+        self._logger.info("Sending initial value to %s peers...", len(peers))
+        total_run = len(peers) // 100 + 1
         for peer in peers:
-            delay = (1.0 / len(peers)+1) * int(self.experiment.get_peer_id(peer.address[0], peer.address[1]))
-            deferLater(reactor, delay, self.transfer, peer, mint_val / (len(peers)+2))
+            peer_id = int(self.experiment.get_peer_id(peer.address[0], peer.address[1]))
+            delay = (total_run / len(peers) * peer_id)
+            deferLater(reactor, delay, self.transfer, peer, mint_val / (len(peers)+1))
 
     @experiment_callback
     def start_creating_transactions(self):
