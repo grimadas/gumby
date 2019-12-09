@@ -1,0 +1,23 @@
+&module gumby.modules.tribler_module.TriblerModule
+&module experiments.trustchain.trustchain_module.TrustchainModule
+
+@0:0 isolate_ipv8_overlay TrustChainCommunity
+@0:0 enable_trustchain_memory_db
+@0:1 enable_trustchain_pex
+@0:2 start_session
+@0:3 init_block_writer
+@0:3 init_trustchain_settings
+@0:4 disable_max_peers
+@0:5 create_random_topology
+@0:10 recheck_connections
+@0:15 mint
+@0:16 minter_send_to_all
+@0:20 annotate start-sharing-transactions
+@0:20 start_direct_noodle_transactions
+@0:21 start_periodic_mem_flush
+@0:30 stop_requesting_signatures
+@0:30 annotate stop-sharing-transactions
+@0:33 commit_block_times
+@0:35 write_overlay_statistics
+@0:35 stop_session
+@0:37 stop
