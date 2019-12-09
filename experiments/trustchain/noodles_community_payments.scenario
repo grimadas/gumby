@@ -8,7 +8,6 @@
 @0:5 init_block_writer
 @0:6 init_trustchain_settings
 @0:9 disable_max_peers
-@0:10 set_validation_range 5
 @0:12 create_community_topology
 @0:40 recheck_connections
 @0:55 mint

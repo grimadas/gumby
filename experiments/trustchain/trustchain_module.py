@@ -6,7 +6,8 @@ from random import randint, random, choice
 from time import time
 
 import networkx as nx
-from twisted.internet.task import LoopingCall
+from twisted.internet import reactor
+from twisted.internet.task import LoopingCall, deferLater
 
 from gumby.experiment import experiment_callback
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
@@ -88,22 +89,21 @@ class TrustchainModule(IPv8OverlayExperimentModule):
         self._logger.info("Setting broadcast to %s", value)
 
     @experiment_callback
-    def turn_informed_broadcast(self):
-        self.overlay.settings.use_informed_broadcast = True
+    def init_trustchain_settings(self):
         self._logger.info("Setting id to %s", self.my_id)
         self.overlay.settings.my_id = self.my_id
-        if os.getenv('IB_TTL'):
-            self.set_ttl(os.getenv('IB_TTL'))
-        if os.getenv('IB_FANOUT'):
-            self.set_fanout(os.getenv('IB_FANOUT'))
-        if os.getenv('IB_SYNC_TIME'):
-            self.set_sync_time(os.getenv('IB_SYNC_TIME'))
-        if os.getenv('IB_NUM_WIT'):
-            self.overlay.settings.com_size = int(os.getenv('IB_NUM_WIT'))
-        if os.getenv('IB_AUDIT_ON'):
+        if os.getenv('TTL'):
+            self.set_ttl(os.getenv('TTL'))
+        if os.getenv('FANOUT'):
+            self.set_fanout(os.getenv('FANOUT'))
+        if os.getenv('SYNC_TIME'):
+            self.set_sync_time(os.getenv('SYNC_TIME'))
+        if os.getenv('NUM_WIT'):
+            self.overlay.settings.com_size = int(os.getenv('NUM_WIT'))
+        if os.getenv('AUDIT_ON'):
             self.overlay.settings.security_mode = SecurityMode.AUDIT
-        if os.getenv('IB_RISK'):
-            self.overlay.settings.risk = float(os.getenv('IB_RISK'))
+        if os.getenv('RISK'):
+            self.overlay.settings.risk = float(os.getenv('RISK'))
 
     @experiment_callback
     def init_block_writer(self):
@@ -195,11 +195,6 @@ class TrustchainModule(IPv8OverlayExperimentModule):
 
         self.request_signatures_lc = LoopingCall(self.request_noodle_1hop_random_signature)
         self.request_signatures_lc.start(value)
-
-        # def start_sig_req():
-
-        # sleep_offset = (self.my_id-1)/len(self.all_vars)
-        # self.overlay.register_anonymous_task("init_delay", reactor.callLater(sleep_offset, start_sig_req))
 
     @experiment_callback
     def stop_requesting_signatures(self):
@@ -331,6 +326,39 @@ class TrustchainModule(IPv8OverlayExperimentModule):
                                 block_type=b'test', transaction=transaction,
                                 double_spend_block=attached_block)
 
+    def is_minter(self):
+        minters = set(nx.get_node_attributes(self.overlay.known_graph, 'minter').keys())
+        my_key = self.overlay.my_peer.public_key.key_to_bin()
+        return my_key in minters
+
+    @experiment_callback
+    def mint(self):
+        if not self.is_minter():
+            return
+
+        self._logger.info("Minting new tokens")
+        mint = self.overlay.prepare_mint_transaction()
+        self.overlay.self_sign_block(block_type=b'claim', transaction=mint)
+
+    @experiment_callback
+    def minter_send_to_all(self):
+        """
+        Have the minter send initial value to all known peers.
+        """
+        if not self.is_minter():
+            return
+
+        mint_val = 100000
+        if os.getenv('INIT_MINT'):
+            mint_val = float(os.getenv('INIT_MINT'))
+        peers = self.overlay.get_peers()
+        self._logger.warning("Sending initial value to %s peers...", len(peers))
+        total_run = len(peers) // 100 + 1
+        for peer in peers:
+            peer_id = int(self.experiment.get_peer_id(peer.address[0], peer.address[1]))
+            delay = (total_run / len(peers) * peer_id)
+            deferLater(reactor, delay, self.transfer, peer, mint_val / (len(peers)+1))
+
     def noodle_random_spend(self, peer, attached_block=None):
 
         dest_peer_id = self.experiment.get_peer_id(peer.address[0], peer.address[1])
@@ -338,13 +366,13 @@ class TrustchainModule(IPv8OverlayExperimentModule):
         minters = set(nx.get_node_attributes(self.overlay.known_graph, 'minter').keys())
         my_key = self.overlay.my_peer.public_key.key_to_bin()
         is_minter = my_key in minters
-        spend_value = 20*random() if is_minter else random()
+        spend_value = 1
 
         val = self.overlay.prepare_spend_transaction(peer.public_key.key_to_bin(), spend_value,
                                                      from_peer=self.my_id, to_peer=dest_peer_id)
         if not val:
             # Cannot make a spend to the peer
-            if os.getenv('ALL_MINT') or is_minter:
+            if self.is_minter():
                 self.mint()
             else:
                 self._logger.warning("No tokens to spend. Waiting for tokens")
