@@ -357,16 +357,11 @@ class TrustchainModule(IPv8OverlayExperimentModule):
         for peer in peers:
             peer_id = int(self.experiment.get_peer_id(peer.address[0], peer.address[1]))
             delay = (total_run / len(peers) * peer_id)
-            deferLater(reactor, delay, self.transfer, peer, mint_val / (len(peers)+1))
+            deferLater(reactor, delay, self.noodle_random_spend, peer, mint_val / (len(peers) + 1))
 
-    def noodle_random_spend(self, peer, attached_block=None):
-
+    def noodle_random_spend(self, peer, spend_value=1, attached_block=None):
         dest_peer_id = self.experiment.get_peer_id(peer.address[0], peer.address[1])
         self._logger.info("%s: Sending spend to: %s", self.my_id, dest_peer_id)
-        minters = set(nx.get_node_attributes(self.overlay.known_graph, 'minter').keys())
-        my_key = self.overlay.my_peer.public_key.key_to_bin()
-        is_minter = my_key in minters
-        spend_value = 1
 
         val = self.overlay.prepare_spend_transaction(peer.public_key.key_to_bin(), spend_value,
                                                      from_peer=self.my_id, to_peer=dest_peer_id)
