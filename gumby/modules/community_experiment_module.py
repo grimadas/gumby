@@ -158,15 +158,15 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         self.build_network(topology)
 
     def build_network(self, topology):
-        '''
+        """
         Given a topology build a network
         :return:
-        '''
-        self.overlay.bootstrap_master = []
+        """
+        self.overlay.bootstrap_master = set()
         # We create a perfect knowledge of 2-hop peers
         for peer in topology.neighbors(int(self.my_id)):
-            self.overlay.bootstrap_master.extend(
-                (self.experiment.get_peer_ip_port_by_id(k) for k in topology[peer]))
+            for k in topology[peer]:
+                self.overlay.bootstrap_master.add(self.experiment.get_peer_ip_port_by_id(k))
             val = self.experiment.get_peer_ip_port_by_id(peer)
             self._logger.info("Peer %s with value %s", peer, val)
 

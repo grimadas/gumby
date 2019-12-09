@@ -223,7 +223,8 @@ class TrustchainModule(IPv8OverlayExperimentModule):
         if os.getenv('INIT_MINT'):
             mint_val = float(os.getenv('INIT_MINT'))
 
-        peers = self.overlay.get_all_communities_peers()
+        #peers = self.overlay.get_all_communities_peers()
+        peers = self.overlay.get_peers()
         self._logger.warning("Sending initial value to %s peers...", len(peers))
         total_run = len(peers) // 100 + 1
         for peer in peers:
