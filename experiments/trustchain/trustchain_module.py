@@ -106,7 +106,7 @@ class TrustchainModule(IPv8OverlayExperimentModule):
             self.overlay.settings.risk = float(os.getenv('IB_RISK'))
 
     @experiment_callback
-    def init_leader_trustchain(self):
+    def init_block_writer(self):
         # Open projects output directory and save blocks arrival time
         self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output', 'leader_blocks_time_'
                                             + str(self.my_id) + '.csv')

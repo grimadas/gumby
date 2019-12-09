@@ -111,21 +111,27 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         for peer in self.all_vars.keys():
             self.overlay.walk_to(self.experiment.get_peer_ip_port_by_id(peer))
 
-    @experiment_callback
-    def introduce_community_topology(self):
-        """
-        Build a community around a one peer
-        """
+    def get_const_minters(self):
+        # Everyone can mint
+        if os.getenv('ALL_MINT'):
+            return self.all_vars.keys()
+
         num_com = 1
         if os.getenv('NUM_COM'):
             num_com = int(os.getenv('NUM_COM'))
         # Choose random peers as minters
         num_nodes = len(self.all_vars.keys())
-        seed(42)
-        minters = sample(self.all_vars.keys(), min(num_com, num_nodes))
+        num_minters = min(num_nodes, num_com)
+        return range(1, num_minters + 1)
+
+    @experiment_callback
+    def create_community_topology(self):
+        """
+        Build a community around a one peer
+        """
         # Work a graph where all peers are connected to minters
         topology = nx.Graph()
-        for m in minters:
+        for m in self.get_const_minters():
             topology.add_node(int(m), minter=True)
             for k in self.all_vars.keys():
                 if k != m:
@@ -133,7 +139,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         self.build_network(topology)
 
     @experiment_callback
-    def introduce_to_bootstrap_peers(self):
+    def create_random_topology(self):
         """
         Introduce to the bootstrap peers
         """
@@ -149,12 +155,9 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         topology = nx.random_graphs.gnm_random_graph(num_nodes,
                                                      num_nodes * avg_degree / 2, seed=42)
         nx.relabel_nodes(topology, {k: k + 1 for k in range(num_nodes)}, copy=False)
-        # Everyone can mint
-        bb = {k: True for k in topology.nodes()}
+
+        bb = {k: True for k in self.get_const_minters()}
         nx.set_node_attributes(topology, bb, 'minter')
-        # 1. Everybody knows everyone
-        # self.overlay.bootstrap_master = [self.experiment.get_peer_ip_port_by_id(k) for k in self.all_vars.keys()]
-        # Assume perfect knowledge of the world
         self.build_network(topology)
 
     def build_network(self, topology):
