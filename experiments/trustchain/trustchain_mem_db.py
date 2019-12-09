@@ -114,6 +114,7 @@ class TrustchainMemoryDatabase(object):
         lpk = claim.link_public_key
         id_from = self.key_to_id(lpk)
         id_to = self.key_to_id(pk)
+        self.update_cum_value(id_from, id_to, float(claim.transaction["total_spend"]))
         if id_from not in self.work_graph or \
                 id_to not in self.work_graph[id_from] or \
                 'total_spend' not in self.work_graph[id_from][id_to] or \
@@ -135,7 +136,7 @@ class TrustchainMemoryDatabase(object):
                                self.get_balance(id_from, True) >= 0):
             self.work_graph[id_from][id_to]['verified'] = True
             # self.update_claim_proof(id_to, id_from)
-            self.update_chain_dependency(id_to)
+            #self.update_chain_dependency(id_to)
 
     def update_claim_proof(self, peer_a, peer_b):
         """
@@ -175,10 +176,11 @@ class TrustchainMemoryDatabase(object):
                                                 for k in self.work_graph.predecessors(peer_id))
 
     def get_total_spends(self, peer_id):
-        if peer_id not in self.work_graph:
+        if peer_id not in self.total_spend_sum:
             return 0
         else:
-            return sum(self.work_graph[peer_id][k]["total_spend"] for k in self.work_graph.successors(peer_id))
+            return self.total_spend_sum[peer_id]
+            # return sum(self.work_graph[peer_id][k]["total_spend"] for k in self.work_graph.successors(peer_id))
 
     def is_verified(self, p1, p2):
         return 'verified' in self.work_graph[p1][p2] and self.work_graph[p1][p2]['verified']
@@ -207,22 +209,11 @@ class TrustchainMemoryDatabase(object):
         return status
 
     def get_total_claims(self, peer_id, only_verified=True):
-        if peer_id not in self.work_graph:
+        if peer_id not in self.total_claim_sum:
             # Peer not known
             return 0
-        return sum(self.work_graph[k][peer_id]['total_spend'] for k in self.work_graph.predecessors(peer_id))
-
-    def _construct_path_id(self, path):
-        res_id = ""
-        res_id = res_id + str(len(path))
-        for k in path[1:-1]:
-            res_id = res_id + str(k[-3:-1])
-        val = self.work_graph[path[-2]][path[-1]]["total_spend"]
-        res_id = res_id + "{0:.2f}".format(val)
-        return res_id
-
-    def get_known_chains(self, peer_id):
-        return (k[0] for k in self.get_peer_chain(peer_id))
+        return self.total_claim_sum[peer_id]
+        #return sum(self.work_graph[k][peer_id]['total_spend'] for k in self.work_graph.predecessors(peer_id))
 
     def add_peer_proofs(self, peer_id, seq_num, status, proofs):
         if peer_id not in self.claim_proofs or self.claim_proofs[peer_id][0] < seq_num:
@@ -265,37 +256,8 @@ class TrustchainMemoryDatabase(object):
                                      total_spend=float(v),
                                      verified=True,
                                      claim_num=status['seq_num'])
-        self.update_chain_dependency(peer_id)
+        #self.update_chain_dependency(peer_id)
         return True
-
-    def get_peer_chain(self, peer_id, seq_num=None, pack_except=set()):
-        """
-        Get minimum claims that can cover the spends of peer_id at seq_num
-
-        :param peer_id:
-        :param seq_num:
-        :param pack_except:
-        """
-        genesis = self.key_to_id(EMPTY_PK)
-        spends = self.get_total_spends(peer_id)
-        vals = []
-        while self.work_graph.has_node(genesis) and self.work_graph.has_node(peer_id) and spends > 0:
-            proofs = []
-            values = []
-            v = heapq.heappop(self.claim_proofs[peer_id])
-            vals.append(v)
-            spends += v[0]
-            proofs.append(v[1])
-            values.append(v[0])
-            if v[1] != genesis:
-                # get the proofs for the peer
-                add_proofs = self.get_peer_chain(v[1])
-                for p, v in add_proofs:
-                    proofs.extend(p)
-                    values.extend(v)
-            yield (proofs)
-        if len(vals) > 0:
-            self.claim_proofs[peer_id] = list(heapq.merge(self.claim_proofs[peer_id], vals))
 
     def get_balance(self, peer_id, verified=True):
         # Sum of claims(verified/or not) - Sum of spends(all known)
