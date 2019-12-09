@@ -113,14 +113,14 @@ class IPv8OverlayExperimentModule(ExperimentModule):
 
     def get_const_minters(self):
         # Everyone can mint
+        num_nodes = len(self.all_vars.keys())
         if os.getenv('ALL_MINT'):
-            return self.all_vars.keys()
+            return range(1, num_nodes+1)
 
         num_com = 1
         if os.getenv('NUM_COM'):
             num_com = int(os.getenv('NUM_COM'))
-        # Choose random peers as minters
-        num_nodes = len(self.all_vars.keys())
+
         num_minters = min(num_nodes, num_com)
         return range(1, num_minters + 1)
 
