@@ -345,9 +345,7 @@ class TrustchainModule(IPv8OverlayExperimentModule):
         if not val:
             # Cannot make a spend to the peer
             if os.getenv('ALL_MINT') or is_minter:
-                self._logger.info("Minting new tokens")
-                mint = self.overlay.prepare_mint_transaction()
-                self.overlay.self_sign_block(block_type=b'claim', transaction=mint)
+                self.mint()
             else:
                 self._logger.warning("No tokens to spend. Waiting for tokens")
         else:
