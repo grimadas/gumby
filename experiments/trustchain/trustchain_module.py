@@ -361,7 +361,7 @@ class TrustchainModule(IPv8OverlayExperimentModule):
 
     def noodle_random_spend(self, peer, spend_value=1, attached_block=None):
         dest_peer_id = self.experiment.get_peer_id(peer.address[0], peer.address[1])
-        self._logger.info("%s: Sending spend to: %s", self.my_id, dest_peer_id)
+        self._logger.debug("%s: Sending spend to: %s", self.my_id, dest_peer_id)
 
         val = self.overlay.prepare_spend_transaction(peer.public_key.key_to_bin(), spend_value,
                                                      from_peer=self.my_id, to_peer=dest_peer_id)
@@ -375,10 +375,12 @@ class TrustchainModule(IPv8OverlayExperimentModule):
             next_hop_peer, tx = val
             next_hop_peer_id = self.experiment.get_peer_id(next_hop_peer.address[0], next_hop_peer.address[1])
             if next_hop_peer_id != dest_peer_id:
+                self._logger.warning("Next peer %s not connected, use multi-hop through %s",
+                                   dest_peer_id, next_hop_peer_id)
                 nonce = self.overlay.persistence.get_new_peer_nonce(peer.public_key.key_to_bin())
                 condition = hexlify(peer.public_key.key_to_bin()).decode()
                 tx.update({'nonce': nonce, 'condition': condition})
-            self._logger.info("%s: Requesting signature from peer: %s", self.my_id, next_hop_peer_id)
+            self._logger.debug("%s: Requesting signature from peer: %s", self.my_id, next_hop_peer_id)
             self.overlay.sign_block(next_hop_peer, next_hop_peer.public_key.key_to_bin(),
                                     block_type=b'spend', transaction=tx)
 
