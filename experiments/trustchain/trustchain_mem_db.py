@@ -73,7 +73,7 @@ class TrustchainMemoryDatabase(object):
         if peer.mid not in self.peer_map:
             self.peer_map[peer.mid] = peer.public_key.key_to_bin()
 
-    def get_latest_peer_block(self, peer_mid):
+    def get_latest_peer_block_by_mid(self, peer_mid):
         if peer_mid in self.peer_map:
             pub_key = self.peer_map[peer_mid]
             return self.get_latest(pub_key)
@@ -124,12 +124,10 @@ class TrustchainMemoryDatabase(object):
             self.work_graph.add_edge(id_from, id_to,
                                      total_spend=float(claim.transaction["total_spend"]),
                                      spend_num=claim.link_sequence_number,
-                                     claim_num=claim.sequence_number,
-                                     claim_key=claim.public_key)
+                                     claim_num=claim.sequence_number)
         elif 'claim_num' not in self.work_graph[id_from][id_to] or \
                 self.work_graph[id_from][id_to]["claim_num"] < claim.sequence_number:
             self.work_graph[id_from][id_to]["claim_num"] = claim.sequence_number
-            self.work_graph[id_from][id_to]["claim_key"] = claim.public_key
 
         if 'verified' not in self.work_graph[id_from][id_to]:
             self.work_graph[id_from][id_to]['verified'] = True
@@ -311,14 +309,19 @@ class TrustchainMemoryDatabase(object):
     def contains(self, block):
         return (block.public_key, block.sequence_number) in self.block_cache
 
-    def get_last_pairwise_block(self, peer_a, peer_b):
-        # get last claim of peer_b by peer_a
-        a_id = self.key_to_id(peer_a)
-        b_id = self.key_to_id(peer_b)
+    def get_last_pairwise_block(self, spender, claimer):
+        """
+        Get last claim of claimer with a spender
+        :param spender:  Public key of a peer
+        :param claimer: Public key of a peer
+        :return: None if no claim exists, BlockPair otherwise
+        """
+        a_id = self.key_to_id(spender)
+        b_id = self.key_to_id(claimer)
         if not self.work_graph.has_edge(a_id, b_id) or 'claim_num' not in self.work_graph[a_id][b_id]:
             return None
         else:
-            blk = self.get(self.work_graph[a_id][b_id]['claim_key'], self.work_graph[a_id][b_id]['claim_num'])
+            blk = self.get(claimer, self.work_graph[a_id][b_id]['claim_num'])
             return self.get_linked(blk), blk
 
     def get_latest(self, public_key, block_type=None):
