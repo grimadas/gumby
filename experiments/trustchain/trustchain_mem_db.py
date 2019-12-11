@@ -186,7 +186,10 @@ class TrustchainMemoryDatabase(object):
                 self.update_chain_dependency(k)
 
     def get_all_spend_peers(self, spender):
-        return self.work_graph.successors(spender)
+        if self.work_graph.has_node(spender):
+            return self.work_graph.successors(spender)
+        else:
+            return []
 
     def get_last_pairwise_spend_num(self, peer_a, peer_b):
         if not self.work_graph.has_edge(peer_a, peer_b) \
