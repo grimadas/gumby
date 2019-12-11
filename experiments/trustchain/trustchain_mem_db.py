@@ -132,23 +132,48 @@ class TrustchainMemoryDatabase(object):
             self.work_graph[id_from][id_to]["claim_key"] = claim.public_key
 
         if 'verified' not in self.work_graph[id_from][id_to]:
-            self.work_graph[id_from][id_to]['verified'] = False
-
+            self.work_graph[id_from][id_to]['verified'] = True
+        '''
         if lpk == EMPTY_PK or (not self.work_graph[id_from][id_to]['verified'] and
                                self.get_balance(id_from, True) >= 0):
             self.work_graph[id_from][id_to]['verified'] = True
             # self.update_claim_proof(id_to, id_from)
             self.update_chain_dependency(id_to)
+        '''
 
-    def update_claim_proof(self, peer_a, peer_b):
+    def update_spend(self, spender, claimer, value, spender_seq_num):
         """
-        Add proven claim relationship peer_a - peer_b
-        :param peer_a: Claimer
-        :param peer_b: Spender
+        Insert/Update edge relationship between peer_a and peer_b
+        :param spender: source
+        :param claimer: target
+        :param value: total balance of the interaction
+        :param spender_seq_num: sequence number of spender for this interaction
+        :return: False if update not succeed => Indication something is missing
+                 True otherwise
         """
-        if peer_a not in self.claim_proofs:
-            self.claim_proofs[peer_a] = []
-        heapq.heappush(self.claim_proofs[peer_a], (-self.work_graph[peer_b][peer_a]['total_spend'], peer_b))
+        val = self.get_total_pairwise_spends(spender, claimer)
+        if value > val:
+            self.work_graph.add_edge(spender, claimer,
+                                     total_spend=value,
+                                     verified=True,
+                                     spend_num=spender_seq_num)
+
+    def update_claim(self, spender, claimer, value, claimer_seq_num):
+        """
+        Insert/Update edge relationship between peer_a and peer_b
+        :param spender: source
+        :param claimer: target
+        :param value: total balance of the interaction
+        :param claimer_seq_num:  sequence number of spender for this interaction
+        :return: False if update not succeed => Indication something is missing
+                 True otherwise
+        """
+        val = self.get_total_pairwise_spends(spender, claimer)
+        if value > val:
+            self.work_graph.add_edge(spender, claimer,
+                                     total_spend=value,
+                                     verified=True,
+                                     claim_num=claimer_seq_num)
 
     def update_chain_dependency(self, peer_id):
         if self.get_balance(peer_id, verified=True) >= 0:
@@ -156,10 +181,24 @@ class TrustchainMemoryDatabase(object):
             for k in self.work_graph.successors(peer_id):
                 if 'verified' in self.work_graph[peer_id][k] and not self.work_graph[peer_id][k]['verified']:
                     self.work_graph[peer_id][k]['verified'] = True
-                    # self.update_claim_proof(k, peer_id)
                     next_vals.append(k)
             for k in next_vals:
                 self.update_chain_dependency(k)
+
+    def get_all_spend_peers(self, spender):
+        return self.work_graph.successors(spender)
+
+    def get_last_pairwise_spend_num(self, peer_a, peer_b):
+        if not self.work_graph.has_edge(peer_a, peer_b) \
+                or "spend_num" not in self.work_graph[peer_a][peer_b]:
+            return 0
+        return self.work_graph[peer_a][peer_b]["spend_num"]
+
+    def get_last_pairwise_claim_num(self, peer_a, peer_b):
+        if not self.work_graph.has_edge(peer_a, peer_b) \
+                or "claim_num" not in self.work_graph[peer_a][peer_b]:
+            return 0
+        return self.work_graph[peer_a][peer_b]["claim_num"]
 
     def get_total_pairwise_spends(self, peer_a, peer_b):
         if not self.work_graph.has_edge(peer_a, peer_b):
@@ -192,10 +231,12 @@ class TrustchainMemoryDatabase(object):
         # Get all spends
         status['spends'] = {}
         for v in self.work_graph.successors(peer_id):
-            status['spends'][v] = self.get_total_pairwise_spends(peer_id, v)
+            status['spends'][v] = (self.get_total_pairwise_spends(peer_id, v),
+                                   self.get_last_pairwise_spend_num(peer_id, v))
         status['claims'] = {}
         for v in self.work_graph.predecessors(peer_id):
-            status['claims'][v] = self.get_total_pairwise_spends(v, peer_id)
+            status['claims'][v] = (self.get_total_pairwise_spends(v, peer_id),
+                                   self.get_last_pairwise_claim_num(v, peer_id))
         status['seq_num'] = self.get_latest(public_key).sequence_number
         return status
 
@@ -214,9 +255,6 @@ class TrustchainMemoryDatabase(object):
         val = self.work_graph[path[-2]][path[-1]]["total_spend"]
         res_id = res_id + "{0:.2f}".format(val)
         return res_id
-
-    def get_known_chains(self, peer_id):
-        return (k[0] for k in self.get_peer_chain(peer_id))
 
     def add_peer_proofs(self, peer_id, seq_num, status, proofs):
         if peer_id not in self.claim_proofs or self.claim_proofs[peer_id][0] < seq_num:
@@ -238,48 +276,13 @@ class TrustchainMemoryDatabase(object):
             # Status is illformed
             return False
 
-        for (p, v) in status['spends'].items():
-            self.work_graph.add_edge(peer_id, p,
-                                     total_spend=float(v),
-                                     verified=True,
-                                     spend_num=status['seq_num'])
+        for (p, (val, seq_num)) in status['spends'].items():
+            self.update_spend(peer_id, p, float(val), int(seq_num))
 
-        for p, v in status['claims'].items():
-            self.work_graph.add_edge(p, peer_id,
-                                     total_spend=float(v),
-                                     verified=True,
-                                     claim_num=status['seq_num'])
-        self.update_chain_dependency(peer_id)
+        for (p, (val, seq_num)) in status['claims'].items():
+            self.update_claim(peer_id, p, float(val), int(seq_num))
+        # self.update_chain_dependency(peer_id)
         return True
-
-    def get_peer_chain(self, peer_id, seq_num=None, pack_except=set()):
-        """
-        Get minimum claims that can cover the spends of peer_id at seq_num
-
-        :param peer_id:
-        :param seq_num:
-        :param pack_except:
-        """
-        genesis = self.key_to_id(EMPTY_PK)
-        spends = self.get_total_spends(peer_id)
-        vals = []
-        while self.work_graph.has_node(genesis) and self.work_graph.has_node(peer_id) and spends > 0:
-            proofs = []
-            values = []
-            v = heapq.heappop(self.claim_proofs[peer_id])
-            vals.append(v)
-            spends += v[0]
-            proofs.append(v[1])
-            values.append(v[0])
-            if v[1] != genesis:
-                # get the proofs for the peer
-                add_proofs = self.get_peer_chain(v[1])
-                for p, v in add_proofs:
-                    proofs.extend(p)
-                    values.extend(v)
-            yield (proofs)
-        if len(vals) > 0:
-            self.claim_proofs[peer_id] = list(heapq.merge(self.claim_proofs[peer_id], vals))
 
     def get_balance(self, peer_id, verified=True):
         # Sum of claims(verified/or not) - Sum of spends(all known)
