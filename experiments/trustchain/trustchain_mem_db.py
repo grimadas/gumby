@@ -273,14 +273,14 @@ class TrustchainMemoryDatabase(object):
 
     def dump_peer_status(self, peer_id, status):
         if 'spends' not in status or 'claims' not in status:
-            # Status is illformed
+            # Status is ill-formed
             return False
 
         for (p, (val, seq_num)) in status['spends'].items():
             self.update_spend(peer_id, p, float(val), int(seq_num))
 
         for (p, (val, seq_num)) in status['claims'].items():
-            self.update_claim(peer_id, p, float(val), int(seq_num))
+            self.update_claim(p, peer_id, float(val), int(seq_num))
         # self.update_chain_dependency(peer_id)
         return True
 
