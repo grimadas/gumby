@@ -69,9 +69,19 @@ class TrustchainModule(IPv8OverlayExperimentModule):
     def turn_off_validation(self):
         self.overlay.settings.ignore_validation = True
 
+    def turn_on_hiding(self):
+        self.overlay.settings.is_hiding = True
+
     @experiment_callback
     def hide_blocks(self):
-        self.overlay.settings.is_hiding = True
+        if os.getenv('NUM_ATKS'):
+            if self.my_id > int(os.getenv('NUM_ATKS')):
+                return
+        if os.getenv('ATK_DELAY'):
+            delay = float(os.getenv('ATK_DELAY'))
+            deferLater(reactor, delay, self.turn_on_hiding)
+        else:
+            self.turn_on_hiding()
 
     @experiment_callback
     def set_sync_time(self, value):
@@ -376,7 +386,7 @@ class TrustchainModule(IPv8OverlayExperimentModule):
             next_hop_peer_id = self.experiment.get_peer_id(next_hop_peer.address[0], next_hop_peer.address[1])
             if next_hop_peer_id != dest_peer_id:
                 self._logger.warning("Next peer %s not connected, use multi-hop through %s",
-                                   dest_peer_id, next_hop_peer_id)
+                                     dest_peer_id, next_hop_peer_id)
                 nonce = self.overlay.persistence.get_new_peer_nonce(peer.public_key.key_to_bin())
                 condition = hexlify(peer.public_key.key_to_bin()).decode()
                 tx.update({'nonce': nonce, 'condition': condition})
