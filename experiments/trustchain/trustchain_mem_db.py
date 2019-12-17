@@ -401,7 +401,11 @@ class TrustchainMemoryDatabase(object):
 
         return blocks
 
+    def write_known_values(self):
+        nx.write_gpickle(self.work_graph, "graph_dump_"+str(time())+".dump")
+
     def commit_block_times(self):
+        self.write_known_values()
         with open(self.block_file, "a") as t_file:
             writer = csv.DictWriter(t_file, ['time', 'transaction', 'type', "seq_num", "link", 'from_id', 'to_id'])
             for block_id in self.block_time:
