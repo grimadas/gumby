@@ -1,5 +1,6 @@
 import csv
 import heapq
+import os
 from binascii import hexlify
 from time import time
 
@@ -35,8 +36,11 @@ class TrustchainMemoryDatabase(object):
         self.nonces = {}
 
         self.block_time = {}
+        self.status_time = {}
+
         self.start_time = None
         self.block_file = None
+        self.status_file = None
 
     def key_to_id(self, key):
         return str(hexlify(key)[-KEY_LEN:])[2:-1]
@@ -94,6 +98,7 @@ class TrustchainMemoryDatabase(object):
             # First block received
             self.start_time = time()
         self.block_time[(block.public_key, block.sequence_number)] = time() - self.start_time
+        self.update_status_times()
 
     def add_spend(self, spend):
         pk = spend.public_key
@@ -283,6 +288,7 @@ class TrustchainMemoryDatabase(object):
         for (p, (val, seq_num)) in status['claims'].items():
             self.update_claim(p, peer_id, float(val), int(seq_num))
         # self.update_chain_dependency(peer_id)
+        self.update_status_times()
         return True
 
     def get_balance(self, peer_id, verified=True):
@@ -401,11 +407,17 @@ class TrustchainMemoryDatabase(object):
 
         return blocks
 
-    def write_known_values(self):
-        nx.write_gpickle(self.work_graph, "graph_dump_"+str(time())+".dump")
+    def update_status_times(self):
+        for k, v in nx.get_edge_attributes(self.work_graph, "total_spend").items():
+            if k not in self.status_time:
+                # Added for the first time
+                self.status_time[k] = {}
+            if v not in self.status_time[k]:
+                # Value not recorded
+                val = self.start_time if self.start_time else time()
+                self.status_time[k][v] = time() - val
 
     def commit_block_times(self):
-        self.write_known_values()
         with open(self.block_file, "a") as t_file:
             writer = csv.DictWriter(t_file, ['time', 'transaction', 'type', "seq_num", "link", 'from_id', 'to_id'])
             for block_id in self.block_time:
@@ -419,6 +431,14 @@ class TrustchainMemoryDatabase(object):
                                  'from_id': from_id, 'to_id': to_id
                                  })
             self.block_time.clear()
+        # Save to the file status time
+        if self.status_file:
+            with open(self.status_file, "w") as t_file:
+                writer = csv.DictWriter(t_file, ['edge', 'value', 'time'])
+                for edge in self.status_time:
+                    for val in self.status_time[edge]:
+                        t = self.status_time[edge][val]
+                        writer.writerow({'edge': str(edge), 'value': val, 'time': t})
 
     def commit(self, my_pub_key):
         """

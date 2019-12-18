@@ -32,6 +32,29 @@ class TrustchainStatisticsParser(StatisticsParser):
 
         self.aggregator.combine_databases()
 
+    def aggregate_statuses(self):
+        prefix = os.path.join(os.environ['PROJECT_DIR'], 'output')
+        postfix = 'status_time_'
+        index = 1
+
+        block_stat_file = os.path.join(prefix, postfix + "agg.csv")
+        with open(block_stat_file, "w") as t_file:
+            writer = csv.DictWriter(t_file, ['edge', 'value', 'time', 'seen_by'])
+            writer.writeheader()
+            while os.path.exists(os.path.join(prefix, postfix + str(index) + '.csv')):
+                with open(os.path.join(prefix, postfix + str(index) + '.csv')) as read_file:
+                    csv_reader = csv.reader(read_file)
+                    first = True
+                    for row in csv_reader:
+                        if first:
+                            first = False
+                        else:
+                            writer.writerow(
+                                {"edge": row[0], 'value': row[1], 'time': row[2], 'seen_by': index})
+                if self.do_cleanup:
+                    os.remove(os.path.join(prefix, postfix + str(index) + '.csv'))
+                index += 1
+
     def aggregate_transactions(self):
         prefix = os.path.join(os.environ['PROJECT_DIR'], 'output')
         postfix = 'leader_blocks_time_'
@@ -366,6 +389,7 @@ class TrustchainStatisticsParser(StatisticsParser):
 
     def run(self):
         self.aggregate_transactions()
+        self.aggregate_statuses()
         self.write_perf_results()
         self.aggregate_databases()
         self.write_blocks_to_file()

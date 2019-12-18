@@ -120,10 +120,13 @@ class TrustchainModule(IPv8OverlayExperimentModule):
         # Open projects output directory and save blocks arrival time
         self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output', 'leader_blocks_time_'
                                             + str(self.my_id) + '.csv')
+        self.status_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output', 'status_time_'
+                                             + str(self.my_id) + '.csv')
         with open(self.block_stat_file, "w") as t_file:
             writer = csv.DictWriter(t_file, ['time', 'transaction', 'type', "seq_num", "link", 'from_id', 'to_id'])
             writer.writeheader()
         self.overlay.persistence.block_file = self.block_stat_file
+        self.overlay.persistence.status_file = self.status_stat_file
         self.overlay.add_listener(GeneratedBlockListener(self.block_stat_file), [b'claim', b'spend', b'test'])
 
     @experiment_callback
