@@ -89,6 +89,8 @@ class NoodleModule(IPv8OverlayExperimentModule):
         if os.getenv('RISK'):
             self.overlay.settings.risk = float(os.getenv('RISK'))
 
+        self.overlay.persistence.do_commit = False
+
         # Add the minter
         minter_pk = self.get_peer("1").public_key.key_to_bin()
         self.overlay.settings.minters = [hexlify(minter_pk)]
