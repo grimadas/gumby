@@ -76,7 +76,7 @@ class NoodleStatisticsParser(BlockchainTransactionsParser):
                                 continue
 
                             if to_peer_id not in peer_map:
-                                print("Peer %s not found in map!" % from_peer_id)
+                                print("Peer %s not found in map!" % to_peer_id)
                                 continue
 
                             from_peer_id = peer_map[from_peer_id]
