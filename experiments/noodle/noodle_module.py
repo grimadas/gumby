@@ -91,6 +91,9 @@ class NoodleModule(IPv8OverlayExperimentModule):
 
         self.overlay.persistence.do_commit = False
 
+        # Set the number of max peers in the SubTrust community to -1
+        self.overlay.settings.max_peers_subtrust = -1
+
         # Add the minter
         minter_pk = self.get_peer("1").public_key.key_to_bin()
         self.overlay.settings.minters = [hexlify(minter_pk)]
