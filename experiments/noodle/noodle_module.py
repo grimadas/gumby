@@ -99,6 +99,13 @@ class NoodleModule(IPv8OverlayExperimentModule):
         if self.is_minter():
             self.overlay.init_minter_community()
 
+        # Make sure that peers can find each other in the SubTrustCommunities
+        self.overlay.bootstrap_master = []
+        for peer_id in self.all_vars.keys():
+            if peer_id == str(self.my_id):
+                continue
+            self.overlay.bootstrap_master.append(self.experiment.get_peer_ip_port_by_id(peer_id))
+
     @experiment_callback
     def turn_off_broadcast(self):
         self.overlay.settings.broadcast_blocks = False
