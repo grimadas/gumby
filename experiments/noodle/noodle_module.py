@@ -458,6 +458,12 @@ class NoodleModule(IPv8OverlayExperimentModule):
             self.overlay.persistence.commit_block_times()
 
     @experiment_callback
+    def write_noodle_stats(self):
+        # Dump outstanding audit proofs
+        with open("outstanding_proof_requests.txt", "w") as proof_requests_file:
+            proof_requests_file.write(json.dumps(self.overlay.proof_requests))
+
+    @experiment_callback
     def write_trustchain_statistics(self):
         from anydex.wallet.tc_wallet import TrustchainWallet
         with open('trustchain.txt', 'w') as trustchain_file:

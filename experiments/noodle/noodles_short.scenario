@@ -2,7 +2,6 @@
 &module experiments.noodle.noodle_module.NoodleModule
 
 @0:0 isolate_ipv8_overlay NoodleCommunity
-@0:1 enable_noodle_pex
 @0:2 start_session
 @0:5 init_block_writer
 @0:6 init_noodle_settings
@@ -16,5 +15,6 @@
 @0:40 stop_creating_transactions
 @0:45 commit_block_times
 @0:45 write_overlay_statistics
+@0:45 write_noodle_stats
 @0:50 stop_session
 @0:60 stop
