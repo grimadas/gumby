@@ -11,6 +11,7 @@ from twisted.internet.task import LoopingCall, deferLater
 from gumby.experiment import experiment_callback
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
 from gumby.modules.experiment_module import static_module
+from gumby.modules.tribler_module import TriblerModule
 
 from ipv8.attestation.noodle.community import NoodleCommunity
 from ipv8.attestation.noodle.listener import BlockListener
@@ -262,6 +263,42 @@ class NoodleModule(IPv8OverlayExperimentModule):
 
         my_peer_id = self.experiment.scenario_runner._peernumber
         deferLater(reactor, (1.0 / total_peers) * (my_peer_id - 1), start_lc)
+
+    @experiment_callback
+    def start_creating_transactions_full(self):
+        """
+        Start creating transactions for a period as defined in the TX_SPAWN_DURATION env variable.
+        This method is also responsible for executing the experiment steps after the transactions have been created.
+        """
+        if "TX_SPAWN_DURATION" not in os.environ:
+            self._logger.info("Not starting to create transactions - TX_SPAWN_DURATION not set")
+            return
+
+        tx_spawn_duration = int(os.environ["TX_SPAWN_DURATION"])
+        self.start_creating_transactions()
+        deferLater(reactor, tx_spawn_duration, self.stop_creating_transactions)
+        deferLater(reactor, 1, self.start_periodic_mem_flush)
+
+        # Schedule post-processing tasks
+        deferLater(reactor, tx_spawn_duration + 5, self.commit_block_times)
+        deferLater(reactor, tx_spawn_duration + 5, self.write_overlay_statistics)
+        deferLater(reactor, tx_spawn_duration + 5, self.write_noodle_stats)
+        deferLater(reactor, tx_spawn_duration + 10, self.stop_tribler_session)
+        deferLater(reactor, tx_spawn_duration + 15, self.stop)
+
+    def get_tribler_module(self):
+        for module in self.experiment.experiment_modules:
+            if isinstance(module, TriblerModule):
+                return module
+
+    def write_overlay_statistics(self):
+        self.get_tribler_module().write_overlay_statistics()
+
+    def stop_tribler_session(self):
+        self.get_tribler_module().stop_session()
+
+    def stop(self):
+        reactor.stop()
 
     @experiment_callback
     def stop_creating_transactions(self):

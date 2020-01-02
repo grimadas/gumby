@@ -57,6 +57,17 @@ class BlockchainTransactionsParser(StatisticsParser):
         else:
             self.avg_latency = avg_latency / num_comfirmed
 
+    def get_latencies(self):
+        """
+        Return a list of all transaction latencies.
+        """
+        latencies = []
+        for transaction in self.transactions:
+            if transaction[4] != -1:
+                latencies.append(transaction[4])
+
+        return latencies
+
     def compute_tx_cumulative_stats(self):
         """
         Compute cumulative transaction statistics.

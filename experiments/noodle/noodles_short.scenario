@@ -10,11 +10,4 @@
 @0:10 set_validation_range 5
 @0:18 mint
 @0:20 minter_send_to_all
-@0:30 start_creating_transactions
-@0:31 start_periodic_mem_flush
-@0:40 stop_creating_transactions
-@0:45 commit_block_times
-@0:45 write_overlay_statistics
-@0:45 write_noodle_stats
-@0:50 stop_session
-@0:60 stop
+@0:30 start_creating_transactions_full

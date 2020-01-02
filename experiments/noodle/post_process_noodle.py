@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-import ast
 import csv
 import json
 import os
+import statistics as np
 import sys
 
 from gumby.post_process_blockchain import BlockchainTransactionsParser
@@ -22,6 +22,7 @@ class NoodleStatisticsParser(BlockchainTransactionsParser):
     def __init__(self, node_directory):
         super(NoodleStatisticsParser, self).__init__(node_directory)
         self.aggregator = GumbyDatabaseAggregator(os.path.join(os.environ['PROJECT_DIR'], 'output'))
+        self.tx_propagation_info = {}  # Keep track of whether a transaction has been seen by the counterparty / confirmed by the initiator
 
     def aggregate_databases(self):
         aggregation_path = os.path.join(os.environ['PROJECT_DIR'], 'output', 'sqlite')
@@ -93,27 +94,40 @@ class NoodleStatisticsParser(BlockchainTransactionsParser):
                                 'transaction': transaction
                             })
 
-                            if block_type == "spend" or block_type == "claim":
-                                if block_type == "spend":
-                                    tx_id = "%d.%d.%d" % (from_peer_id, to_peer_id, from_seq_num)
-                                    if tx_id not in tx_info:
-                                        tx_info[tx_id] = [-1, -1]
+                            if block_type == "spend":
+                                tx_id = "%d.%d.%d" % (from_peer_id, to_peer_id, from_seq_num)
+                                if tx_id not in tx_info:
+                                    tx_info[tx_id] = [-1, -1]
 
-                                    # Update the submit time
-                                    tx_info[tx_id][0] = block_time - self.avg_start_time
-                                elif block_type == "claim" and to_peer_id == peer_nr:
-                                    tx_id = "%d.%d.%d" % (to_peer_id, from_peer_id, to_seq_num)
-                                    if tx_id not in tx_info:
-                                        tx_info[tx_id] = [-1, -1]
+                                if tx_id not in self.tx_propagation_info:
+                                    self.tx_propagation_info[tx_id] = [False, False]
 
-                                    # Update the confirm time
-                                    tx_info[tx_id][1] = block_time - self.avg_start_time
+                                if peer_nr == to_peer_id:
+                                    self.tx_propagation_info[tx_id][0] = True
+
+                                # Update the submit time
+                                tx_info[tx_id][0] = block_time - self.avg_start_time
+                            elif block_type == "claim" and to_peer_id == peer_nr:
+                                tx_id = "%d.%d.%d" % (to_peer_id, from_peer_id, to_seq_num)
+                                if tx_id not in tx_info:
+                                    tx_info[tx_id] = [-1, -1]
+
+                                if tx_id not in self.tx_propagation_info:
+                                    self.tx_propagation_info[tx_id] = [False, False]
+
+                                if peer_nr == to_peer_id:
+                                    self.tx_propagation_info[tx_id][1] = True
+
+                                # Update the confirm time
+                                tx_info[tx_id][1] = block_time - self.avg_start_time
 
             for tx_id, individual_tx_info in tx_info.items():
                 tx_latency = -1
                 if individual_tx_info[0] != -1 and individual_tx_info[1] != -1:
                     tx_latency = individual_tx_info[1] - individual_tx_info[0]
-                self.transactions.append((1, tx_id, individual_tx_info[0], individual_tx_info[1], tx_latency))
+
+                if individual_tx_info[0] >= 0:  # Do not include mint transactions or transactions created before the experiment starts
+                    self.transactions.append((1, tx_id, individual_tx_info[0], individual_tx_info[1], tx_latency))
 
     def write_blocks_to_file(self):
         # First, determine the experiment start time
@@ -187,217 +201,66 @@ class NoodleStatisticsParser(BlockchainTransactionsParser):
                 trustchain_interactions_file.write("%d,%d\n" % (peer_a, peer_b))
 
     def write_perf_results(self):
-        peer_counts = {}
-        tx_ops = dict()
-        tx_stats = dict()
-        min_time = None
-        max_time = None
-        tx_map = dict()
-        seen_by_map = dict()
-        # time,transaction,type,seq_num,seen_by
+        # Compute average throughput
+        tx_spawn_duration = int(os.environ["TX_SPAWN_DURATION"])
+        grace_period = float(os.environ["TX_GRACE_PERIOD"]) * 1000
+        total_confirmed = 0
+        total_unconfirmed = 0
+        for transaction in self.transactions:
+            if transaction[3] == -1:
+                total_unconfirmed += 1
 
-        index = 0
-        with open("transactions.txt") as read_file:
-            csv_reader = csv.reader(read_file)
-            first = True
-            for row in csv_reader:
-                if first:
-                    first = False
-                else:
-                    time = float(row[0])
-                    seen_by = int(row[-1])  # seen_by by peer
-                    type_val = row[2]
-                    seq_num_tuple = ast.literal_eval(row[3])  # seq_num, link_num
-                    peer_ids = ast.literal_eval(row[4])  # from_peer, to_peer
+            if grace_period <= transaction[2] <= transaction[2] + grace_period:
+                total_confirmed += 1
 
-                    tx = ast.literal_eval(row[1])
-                    if 'mint_proof' in tx:
-                        continue
-                    if 'proof' in tx:
-                        # Tx with/without proofs are the same
-                        del tx['proof']
-                    if 'condition' in tx:
-                        del tx['total_spend']
+        # Compute tx propagation info
+        num_spend_send_fail = 0
+        num_claim_send_fail = 0
+        for tx_id in self.tx_propagation_info:
+            if not self.tx_propagation_info[tx_id][0]:
+                num_spend_send_fail += 1
+            if not self.tx_propagation_info[tx_id][1]:
+                num_claim_send_fail += 1
 
-                    if str(tx) not in tx_map:
-                        tx_map[str(tx)] = index
-                        index += 1
+        # Compute transactions / sec
+        throughput_per_sec = {}
+        for transaction in self.transactions:
+            time_slot = transaction[2] // 1000
+            if time_slot not in throughput_per_sec:
+                throughput_per_sec[time_slot] = 0
 
-                    tx_map_ind = tx_map[str(tx)]
-                    # The peer that initiated the transaction
-                    from_peer = int(tx['peer']) if 'peer' in tx else int(tx['from_peer'])
-                    # The peer that should receive the transaction
-                    to_peer = int(tx['to_peer']) if 'to_peer' in tx else None
-                    # When it was claimed - seq number
-                    tx_id = str(tx_map_ind) + str(peer_ids) + str(seq_num_tuple)
-
-                    # Calculate the total runtime
-                    if not min_time or time < min_time:
-                        min_time = time
-                    if not max_time or time > max_time:
-                        max_time = time
-                    # Transaction seen by how many times
-                    if tx_map_ind not in tx_stats:
-                        tx_stats[tx_map_ind] = dict()
-                    if tx_map_ind not in tx_ops:
-                        tx_ops[tx_map_ind] = {tx_id}
-                    else:
-                        tx_ops[tx_map_ind].add(tx_id)
-
-                        # Init peer info
-                    if seen_by not in peer_counts:
-                        peer_counts[seen_by] = {"from_count": 0, "to_count": 0, "others": 0}
-
-                    if from_peer == seen_by:
-                        # If this is a source operation
-                        peer_counts[seen_by]["from_count"] += 1
-                        if int(seq_num_tuple[1]) == 0 and 'first_create' not in tx_stats[tx_map_ind]:
-                            # This is creation block
-                            tx_stats[tx_map_ind]['first_create'] = time
-                            tx_stats[tx_map_ind]['creator'] = from_peer
-                            tx_stats[tx_map_ind]['partner'] = to_peer
-                        elif int(seq_num_tuple[1]) != 0 and 'round_time' not in tx_stats[tx_map_ind]:
-                            # The source peer sees the claim confirmation
-                            tx_stats[tx_map_ind]['round_time'] = time
-                    elif to_peer == seen_by:
-                        # Dest operation
-                        peer_counts[seen_by]["to_count"] += 1
-                        if int(seq_num_tuple[1]) == 0 and 'first_seen' not in tx_stats[tx_map_ind]:
-                            # Spend first seen by the counterparty
-                            tx_stats[tx_map_ind]['first_seen'] = time
-                        elif int(seq_num_tuple[1]) != 0 and 'claim_time' not in tx_stats[tx_map_ind]:
-                            # The transaction claimed
-                            tx_stats[tx_map_ind]['claim_time'] = time
-                    else:
-                        # Other operations seen
-                        peer_counts[seen_by]["others"] += 1
-                        if 'last_time' not in tx_stats[tx_map_ind]:
-                            tx_stats[tx_map_ind]['last_time'] = time
-                            seen_by_map[tx_map_ind] = {seen_by}
-                        elif seen_by not in seen_by_map[tx_map_ind] and tx_stats[tx_map_ind]['last_time'] < time:
-                            tx_stats[tx_map_ind]['last_time'] = time
-
-        with open("tx_latencies.csv", "w") as t_file:
-            writer = csv.DictWriter(t_file, ['peer_id', 'tx_id', 'submit_time', 'confirm_time', 'latency', 'part_id'])
-            writer.writeheader()
-            # Write file with transaction submit and confirm times
-            tx_index = 1
-            for tx_id in tx_stats:
-                created = int(1000 * tx_stats[tx_id]['first_create'])
-                round = int(1000 * tx_stats[tx_id]['round_time']) if 'round_time' in tx_stats[tx_id] else -1
-                latency = round - created if round > 0 else -1
-                peer_id = tx_stats[tx_id]['creator']
-                part_id = tx_stats[tx_id]['partner']
-                writer.writerow(
-                                {"peer_id": peer_id, 'tx_id': tx_index, 'submit_time': created,
-                                 'confirm_time': round, 'latency': latency, 'part_id': part_id})
-                tx_index += 1
-
-        import math
-        import statistics as np
-
-        total_run = max_time
-        if os.getenv('TOTAL_RUN'):
-            total_run = float(os.getenv('TOTAL_RUN'))
-
-        latency_round = []
-        latency_all = []
-        throughput = {l: 0 for l in range(int(max_time) + 1)}
-        errs = 0
-        failed = 0
-        ops = []
-
-        for t in tx_stats:
-            if 'round_time' not in tx_stats[t]:
-                # The confirmation was never seen by the source
-                failed += 1
-            else:
-                val = tx_stats[t]
-                if 'first_seen' not in val:
-                    # The transaction was not seen by the counterparty
-                    errs += 1
-                    continue
-                round_trip = abs(val['round_time'] - val['first_create'])
-                latency_round.append(round_trip)
-                throughput[math.floor(val['round_time'])] += 1
-                if 'last_time' not in val:
-                    val['last_time'] = val['round_time']
-                all_seen = abs(val['last_time'] - val['first_seen'])
-                latency_all.append(all_seen)
-                ops.append(len(tx_ops[t]))
-
-        thrg = {x: y for x, y in throughput.items() if y and x < total_run+1}
+            throughput_per_sec[time_slot] += 1
 
         # Write performance results in a file
         with open("perf_results.txt", 'w') as w_file:
-            w_file.write("Total txs: %d\n" % len(tx_stats))
-            w_file.write("Number of peers: %d\n" % len(peer_counts))
-            w_file.write("Total experiment time: %f\n" % (max_time - min_time))
-            w_file.write("Total planned experiment time: %f\n" % total_run)
-            w_file.write("\n")
+            w_file.write("Total spend transactions: %d\n" % len(self.transactions))
+            w_file.write("Total unconfirmed transactions: %d\n" % total_unconfirmed)
+            w_file.write("Number of peers: %s\n" % os.environ["GUMBY_das4_instances_to_run"])
 
             if os.getenv('TX_RATE'):
                 tx_rate = int(os.getenv('TX_RATE'))
                 w_file.write("System transaction rate: %d\n" % tx_rate)
-            if os.getenv('FANOUT'):
-                value = int(os.getenv('FANOUT'))
-                w_file.write("Peer fanout: %d\n" % value)
 
-            w_file.write("Peak throughput: %d\n" % max(thrg.values()))
-            w_file.write("Avg throughput: %d\n" % np.mean(thrg.values()))
-            w_file.write("St dev throughput: %d\n" % np.stdev(thrg.values()))
-            w_file.write("Min throughput: %d\n" % min(thrg.values()))
             w_file.write("\n")
 
-            w_file.write("Median operations per transaction: %d\n" % np.median(ops))
-            w_file.write("Min operations per transaction: %d\n" % min(ops))
-            w_file.write("Max operations per transaction: %d\n" % max(ops))
+            w_file.write("=== throughput ===\n")
+            w_file.write("Peak throughput: %d\n" % max(throughput_per_sec.values()))
+            w_file.write("Avg throughput: %f\n" % (total_confirmed / tx_spawn_duration))
+            w_file.write("St dev throughput: %d\n" % np.stdev(throughput_per_sec.values()))
+            w_file.write("Min throughput: %d\n" % min(throughput_per_sec.values()))
             w_file.write("\n")
 
-            w_file.write("Min round latency: %f\n" % min(latency_round))
-            w_file.write("Mean round latency: %f\n" % np.mean(latency_round))
-            w_file.write("St dev round latency: %f\n" % np.stdev(latency_round))
-            w_file.write("Max round latency: %f\n" % max(latency_round))
+            latencies = self.get_latencies()
+            w_file.write("=== latency ===\n")
+            w_file.write("Min tx latency: %f\n" % min(latencies))
+            w_file.write("Mean tx latency: %f\n" % np.mean(latencies))
+            w_file.write("St dev tx latency: %f\n" % np.stdev(latencies))
+            w_file.write("Max tx latency: %f\n" % max(latencies))
             w_file.write("\n")
 
-            w_file.write("Min other received latency: %f\n" % min(latency_all))
-            w_file.write("Mean other received latency: %f\n" % np.mean(latency_all))
-            w_file.write("St dev other received latency: %f\n" % np.stdev(latency_all))
-            w_file.write("Max other received latency: %f\n" % max(latency_all))
-            w_file.write("\n")
-
-            w_file.write(
-                "Min from ops: %d\n" % min([d['from_count'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "Average from ops: %d\n" % np.mean([d['from_count'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "St dev from ops: %d\n" % np.stdev([d['from_count'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "Max from ops: %d\n" % max([d['from_count'] for k, d in peer_counts.items()]))
-            w_file.write("\n")
-
-            w_file.write(
-                "Min to ops: %d\n" % min([d['to_count'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "Average to ops: %d\n" % np.mean([d['to_count'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "St dev to ops: %d\n" % np.stdev([d['to_count'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "Max to ops: %d\n" % max([d['to_count'] for k, d in peer_counts.items()]))
-            w_file.write("\n")
-
-            w_file.write(
-                "Min other ops: %d\n" % min([d['others'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "Average other ops: %d\n" % np.mean([d['others'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "St dev other ops: %d\n" % np.stdev([d['others'] for k, d in peer_counts.items()]))
-            w_file.write(
-                "Max other ops: %d\n" % max([d['others'] for k, d in peer_counts.items()]))
-            w_file.write("\n")
-
-            w_file.write("Network/Relay transactions Not seen by the counterparty: %d\n" % errs)
-            w_file.write("Failed transactions/ Not seen by the source: %d\n" % failed)
+            w_file.write("=== network reliability ===\n")
+            w_file.write("Spend transactions not seen by counterparty: %d\n" % num_spend_send_fail)
+            w_file.write("Claim transactions not seen by counterparty: %d\n" % num_claim_send_fail)
 
     def run(self):
         self.parse()
