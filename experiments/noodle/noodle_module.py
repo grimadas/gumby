@@ -11,6 +11,7 @@ from twisted.internet.task import LoopingCall, deferLater
 from gumby.experiment import experiment_callback
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
 from gumby.modules.experiment_module import static_module
+from gumby.modules.profile_module import ProfileModule
 from gumby.modules.tribler_module import TriblerModule
 
 from ipv8.attestation.noodle.community import NoodleCommunity
@@ -285,6 +286,15 @@ class NoodleModule(IPv8OverlayExperimentModule):
         deferLater(reactor, tx_spawn_duration + 5, self.write_noodle_stats)
         deferLater(reactor, tx_spawn_duration + 10, self.stop_tribler_session)
         deferLater(reactor, tx_spawn_duration + 15, self.stop)
+
+        profile_module = self.get_profile_module()
+        if profile_module:
+            deferLater(reactor, tx_spawn_duration + 12, profile_module.stop_yappi)
+
+    def get_profile_module(self):
+        for module in self.experiment.experiment_modules:
+            if isinstance(module, ProfileModule):
+                return module
 
     def get_tribler_module(self):
         for module in self.experiment.experiment_modules:
