@@ -173,7 +173,7 @@ class TriblerTunnelCommunityLauncher(IPv8CommunityLauncher):
 class TrustChainCommunityLauncher(IPv8CommunityLauncher):
 
     def should_launch(self, session):
-        return session.config.get_trustchain_enabled()
+        return False #session.config.get_trustchain_enabled()
 
     def get_overlay_class(self):
         from ipv8.attestation.trustchain.community import TrustChainCommunity
