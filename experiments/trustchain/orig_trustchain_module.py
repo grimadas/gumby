@@ -231,7 +231,6 @@ class TrustchainModule(IPv8OverlayExperimentModule):
     @experiment_callback
     def stop_requesting_signatures(self):
         self.request_signatures_lc.stop()
-        self.overlay.all_sync_stop()
 
     @experiment_callback
     def start_req_sign_with_random_double_spends(self, batch=1, chance=0.1):
@@ -355,8 +354,7 @@ class TrustchainModule(IPv8OverlayExperimentModule):
         self._logger.info("%s: Requesting signature from peer: %s", self.my_id, peer_id)
         transaction = {"up": up, "down": down, "from_peer": self.my_id, "to_peer": peer_id}
         self.overlay.sign_block(peer, peer.public_key.key_to_bin(),
-                                block_type=b'test', transaction=transaction,
-                                double_spend_block=attached_block)
+                                block_type=b'test', transaction=transaction)
 
     def is_minter(self):
         minters = set(nx.get_node_attributes(self.overlay.known_graph, 'minter').keys())
