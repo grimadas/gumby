@@ -5,6 +5,7 @@
 @0:1 enable_trustchain_memory_db
 @0:2 start_session
 @0:5 init_trustchain
+@0:6 init_trustchain_settings
 @0:6 disable_max_peers
 @0:10 introduce_all_peers
 @0:30 annotate start-creating-blocks
