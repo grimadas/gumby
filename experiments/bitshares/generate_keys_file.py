@@ -13,6 +13,6 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "keypairs.tx
     for ind, line in enumerate(lines):
         if len(line) > 0:
             parts = line.split(",")
-            print ind
-            print parts[0]
-            print parts[1]
+            print(ind)
+            print(parts[0])
+            print(parts[1])
