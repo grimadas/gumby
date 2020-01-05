@@ -36,7 +36,7 @@ class TrustchainMemoryDatabase(object):
 
         self.block_time = {}
         self.block_file = None
-                
+
         self.total_spend_sum = {}
         self.total_claim_sum = {}
 
@@ -90,7 +90,9 @@ class TrustchainMemoryDatabase(object):
             self.add_spend(block)
         if block.type == b"claim":
             self.add_claim(block)
-        self.block_time[(block.public_key, block.sequence_number)] = int(round(time.time() * 1000))
+        self.block_time[(block.public_key, block.sequence_number,
+                         block.link_public_key, block.link_sequence_number)] \
+            = int(round(time.time() * 1000))
 
     def add_spend(self, spend):
         pk = spend.public_key
@@ -203,7 +205,7 @@ class TrustchainMemoryDatabase(object):
             # Peer not known
             return 0
         return self.total_claim_sum[peer_id]
-    
+
     def _construct_path_id(self, path):
         res_id = ""
         res_id = res_id + str(len(path))
@@ -230,7 +232,7 @@ class TrustchainMemoryDatabase(object):
             return 0
         else:
             return self.claim_proofs[peer_id][0]
-    
+
     def update_cum_value(self, p1, p2, value):
         if not self.work_graph.has_edge(p1, p2) or value > self.work_graph[p1][p2]['total_spend']:
             prev_spend = self.get_total_pairwise_spends(p1, p2)
@@ -402,17 +404,10 @@ class TrustchainMemoryDatabase(object):
 
     def commit_block_times(self):
         with open(self.block_file, "a") as t_file:
-            writer = csv.DictWriter(t_file, ['time', 'transaction', 'type', "seq_num", "link", 'from_id', 'to_id'])
+            writer = csv.DictWriter(t_file, ['block_id', 'time'])
             for block_id in self.block_time:
-                block = self.block_cache[block_id]
                 time = self.block_time[block_id]
-                from_id = hexlify(block.public_key).decode()[-8:]
-                to_id = hexlify(block.link_public_key).decode()[-8:]
-                writer.writerow({"time": time, 'transaction': str(block.transaction),
-                                 'type': block.type.decode(),
-                                 'seq_num': block.sequence_number, "link": block.link_sequence_number,
-                                 'from_id': from_id, 'to_id': to_id
-                                 })
+                writer.writerow({'block_id': block_id, "time": time})
             self.block_time.clear()
 
     def commit(self, my_pub_key):

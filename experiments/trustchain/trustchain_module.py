@@ -81,6 +81,12 @@ class TrustchainModule(IPv8OverlayExperimentModule):
 
     @experiment_callback
     def init_trustchain(self):
+        self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'],
+                                            'output', 'leader_blocks_time_'+str(self.my_id)+'.csv')
+        with open(self.block_stat_file, "w") as t_file:
+            writer = csv.DictWriter(t_file, ['block_id', 'time'])
+            writer.writeheader()
+        self.overlay.persistence.block_file = self.block_stat_file
         self.overlay.add_listener(FakeBlockListener(), [b'test'])
 
     @experiment_callback
@@ -101,8 +107,14 @@ class TrustchainModule(IPv8OverlayExperimentModule):
 
     @experiment_callback
     def start_requesting_signatures(self):
+        if os.getenv('TX_SEC'):
+            value = 1 / float(os.getenv('TX_SEC'))
+        else:
+            value = 0.001
+        self._logger.info("Setting transaction rate to %s", 1 / value)
+
         self.request_signatures_lc = LoopingCall(self.request_random_signature)
-        self.request_signatures_lc.start(1)
+        self.request_signatures_lc.start(value)
 
     @experiment_callback
     def stop_requesting_signatures(self):
@@ -182,6 +194,13 @@ class TrustchainModule(IPv8OverlayExperimentModule):
     def commit_blocks_to_db(self):
         if self.session.config.use_trustchain_memory_db():
             self.overlay.persistence.commit(self.overlay.my_peer.public_key.key_to_bin())
+
+    @experiment_callback
+    def commit_block_times(self):
+        self._logger.error("Commit block times to the file %s", self.overlay.persistence.block_file)
+        if self.session.config.use_trustchain_memory_db():
+            self._logger.error("Commit block times to the file %s", self.overlay.persistence.block_file)
+            self.overlay.persistence.commit_block_times()
 
     @experiment_callback
     def write_trustchain_statistics(self):
