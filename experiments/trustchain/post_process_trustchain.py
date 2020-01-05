@@ -53,6 +53,7 @@ class TrustchainStatisticsParser(StatisticsParser):
         stats = []
         nums = []
         import ast
+        max_time = 0
 
         for block_id in agg_block_time:
             b_id, seq, l_id, l_seq = ast.literal_eval(block_id)
@@ -67,6 +68,8 @@ class TrustchainStatisticsParser(StatisticsParser):
             tx_times = agg_block_time[block_id].values()
             start = min(tx_times)
             end = max(tx_times)
+            if end > max_time:
+                max_time = end
             num = len(tx_times)
             stats.append(end - start)
             nums.append(num)
@@ -78,10 +81,10 @@ class TrustchainStatisticsParser(StatisticsParser):
         total_run = 60
         if os.getenv('TOTAL_RUN'):
             total_run = float(os.getenv('TOTAL_RUN'))
-        throughput = {l: 0 for l in range(int(total_run + 2) + 1)}
+        throughput = {l: 0 for l in range(int(total_run + 5) + 1)}
         latencies = []
         for tx_id in final_time:
-            throughput[math.floor(final_time[tx_id][1])] += 1
+            throughput[math.floor(final_time[tx_id][1] - max_time)] += 1
             latencies.append(final_time[tx_id][0])
 
         # Time till everyone recieves
