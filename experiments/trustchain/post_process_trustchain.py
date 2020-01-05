@@ -97,7 +97,7 @@ class TrustchainStatisticsParser(StatisticsParser):
             w_file.write("\n")
 
             if os.getenv('TX_SEC'):
-                value = float(os.getenv('TX_SEC'))
+                value = 1 / float(os.getenv('TX_SEC'))
                 w_file.write("System transaction rate: %d\n" % (max(nums) * value))
             if os.getenv('IB_FANOUT'):
                 value = int(os.getenv('IB_FANOUT'))
