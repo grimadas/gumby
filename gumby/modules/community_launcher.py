@@ -6,7 +6,6 @@ from ipv8.peerdiscovery.discovery import RandomWalk
 
 
 class CommunityLauncher(object):
-
     """
     Object in charge of preparing a Community for loading in IPv8.
     """
@@ -188,6 +187,37 @@ class TrustChainCommunityLauncher(IPv8CommunityLauncher):
 
     def finalize(self, ipv8, session, community):
         super(TrustChainCommunityLauncher, self).finalize(ipv8, session, community)
+        session.lm.trustchain_community = community
+
+        # If we're using a memory DB, replace the existing one
+        if session.config.use_trustchain_memory_db():
+            orig_db = community.persistence
+
+            from experiments.trustchain.trustchain_mem_db import TrustchainMemoryDatabase
+            community.persistence = TrustchainMemoryDatabase(session.config.get_state_dir(), 'trustchain')
+            community.persistence.original_db = orig_db
+
+        if session.config.use_pex_discovery():
+            community.ipv8 = ipv8
+
+
+class OrigTrustChainCommunityLauncher(IPv8CommunityLauncher):
+
+    def should_launch(self, session):
+        return session.config.get_trustchain_enabled()
+
+    def get_overlay_class(self):
+        from ipv8.attestation.trustchain.orig_community import OrigTrustChainCommunity
+        return OrigTrustChainCommunity
+
+    def get_my_peer(self, ipv8, session):
+        return Peer(session.trustchain_keypair)
+
+    def get_kwargs(self, session):
+        return {'working_directory': session.config.get_state_dir()}
+
+    def finalize(self, ipv8, session, community):
+        super(OrigTrustChainCommunityLauncher, self).finalize(ipv8, session, community)
         session.lm.trustchain_community = community
 
         # If we're using a memory DB, replace the existing one
