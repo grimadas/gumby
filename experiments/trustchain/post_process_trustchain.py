@@ -55,8 +55,8 @@ class TrustchainStatisticsParser(StatisticsParser):
 
         for block_id in agg_block_time:
             print(block_id)
-            print(len(block_id))
-            b_id, seq, l_id, l_seq = block_id
+            print(block_id.strip())
+            b_id, seq, l_id, l_seq = block_id.strip()
             if l_seq != 0:
                 # This is confirmation block
                 tx_id = (l_id, l_seq)

@@ -100,8 +100,9 @@ class TrustchainMemoryDatabase(object):
             # First block received
             self.start_time = time()
         self.block_time[(block.public_key, block.sequence_number)] = time() - self.start_time
-        self.block_times_dict[(block.public_key, block.sequence_number,
-                         block.link_public_key, block.link_sequence_number)] \
+
+        self.block_times_dict[(int(block.transaction['from_peer']), block.sequence_number,
+                         int(block.transaction['to_peer']), block.link_sequence_number)] \
             = int(round(time() * 1000))
         self.update_status_times()
 
