@@ -45,7 +45,7 @@ class TrustchainStatisticsParser(StatisticsParser):
                         time = row[1]
                         if block_id not in agg_block_time:
                             agg_block_time[block_id] = {}
-                        agg_block_time[block_id][index] = time
+                        agg_block_time[block_id][index] = int(time)
                 #if self.do_cleanup:
                     #os.remove(os.path.join(prefix, postfix + str(index) + '.csv'))
                 index += 1
