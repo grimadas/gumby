@@ -84,7 +84,7 @@ class TrustchainStatisticsParser(StatisticsParser):
         throughput = {l: 0 for l in range(int(total_run + 5) + 1)}
         latencies = []
         for tx_id in final_time:
-            throughput[math.floor(final_time[tx_id][1] - max_time)] += 1
+            throughput[math.floor((max_time-final_time[tx_id][1])/1000)] += 1
             latencies.append(final_time[tx_id][0])
 
         # Time till everyone recieves
