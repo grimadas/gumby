@@ -228,9 +228,6 @@ class OrigTrustChainCommunityLauncher(IPv8CommunityLauncher):
             community.persistence = TrustchainMemoryDatabase(session.config.get_state_dir(), 'trustchain')
             community.persistence.original_db = orig_db
 
-        if session.config.use_pex_discovery():
-            community.ipv8 = ipv8
-
 
 class MarketCommunityLauncher(IPv8CommunityLauncher):
 
