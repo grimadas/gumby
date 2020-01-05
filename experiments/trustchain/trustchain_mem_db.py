@@ -37,10 +37,12 @@ class TrustchainMemoryDatabase(object):
 
         self.block_time = {}
         self.status_time = {}
+        self.block_times_dict = {}
 
         self.start_time = None
         self.block_file = None
         self.status_file = None
+        self.block_times_file = None
 
     def key_to_id(self, key):
         return str(hexlify(key)[-KEY_LEN:])[2:-1]
@@ -98,6 +100,9 @@ class TrustchainMemoryDatabase(object):
             # First block received
             self.start_time = time()
         self.block_time[(block.public_key, block.sequence_number)] = time() - self.start_time
+        self.block_times_dict[(block.public_key, block.sequence_number,
+                         block.link_public_key, block.link_sequence_number)] \
+            = int(round(time() * 1000))
         self.update_status_times()
 
     def add_spend(self, spend):
@@ -418,6 +423,13 @@ class TrustchainMemoryDatabase(object):
                 self.status_time[k][v] = time() - val
 
     def commit_block_times(self):
+        with open(self.block_times_file, "a") as t_file:
+            writer = csv.DictWriter(t_file, ['block_id', 'time'])
+            for block_id in self.block_times_dict:
+                time = self.block_times_dict[block_id]
+                writer.writerow({'block_id': block_id, "time": time})
+            self.block_times_dict.clear()
+
         with open(self.block_file, "a") as t_file:
             writer = csv.DictWriter(t_file, ['time', 'transaction', 'type', "seq_num", "link", 'from_id', 'to_id'])
             for block_id in self.block_time:

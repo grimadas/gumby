@@ -1,0 +1,18 @@
+&module gumby.modules.tribler_module.TriblerModule
+&module experiments.trustchain.orig_trustchain_module.TrustchainModule
+
+@0:1 isolate_ipv8_overlay OrigTrustChainCommunity
+@0:1 enable_trustchain_memory_db
+@0:2 start_session
+@0:5 init_trustchain
+@0:6 disable_max_peers
+@0:10 introduce_all_peers
+@0:30 annotate start-creating-blocks
+@0:30 start_requesting_signatures
+@0:90 stop_requesting_signatures
+@0:95 write_overlay_statistics
+@0:95 write_trustchain_statistics
+@0:95 commit_blocks_to_db
+@0:96 commit_block_times
+@0:100 stop_session
+@0:105 stop

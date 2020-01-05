@@ -25,6 +25,100 @@ class TrustchainStatisticsParser(StatisticsParser):
         if os.getenv('CLEAN_UP'):
             self.do_cleanup = bool(os.getenv('CLEAN_UP'))
 
+    def aggregate_trustchain_times(self):
+        prefix = os.path.join(os.environ['PROJECT_DIR'], 'output')
+        postfix = 'block_times_'
+        index = 1
+
+        agg_block_time = {}
+        final_time = {}
+
+        while os.path.exists(os.path.join(prefix, postfix + str(index) + '.csv')):
+            with open(os.path.join(prefix, postfix + str(index) + '.csv')) as read_file:
+                csv_reader = csv.reader(read_file)
+                first = True
+                for row in csv_reader:
+                    if first:
+                        first = False
+                    else:
+                        block_id = row[0]
+                        time = row[1]
+                        if block_id not in agg_block_time:
+                            agg_block_time[block_id] = {}
+                        agg_block_time[block_id][index] = time
+                if self.do_cleanup:
+                    os.remove(os.path.join(prefix, postfix + str(index) + '.csv'))
+                index += 1
+
+        stats = []
+        nums = []
+
+        for block_id in agg_block_time:
+            b_id, seq, l_id, l_seq = block_id
+            if l_seq != 0:
+                # This is confirmation block
+                tx_id = (l_id, l_seq)
+                start_time = min(agg_block_time[(l_id, l_seq, b_id, 0)].values())
+                end_time = min(agg_block_time[block_id].values())
+                if tx_id not in final_time:
+                    final_time[tx_id] = (end_time - start_time, end_time)
+
+            tx_times = agg_block_time[block_id].values()
+            start = min(tx_times)
+            end = max(tx_times)
+            num = len(tx_times)
+            stats.append(end - start)
+            nums.append(num)
+
+        # Write the statistics for the files
+        import math
+        import statistics as np
+
+        total_run = 60
+        if os.getenv('TOTAL_RUN'):
+            total_run = float(os.getenv('TOTAL_RUN'))
+        throughput = {l: 0 for l in range(int(total_run + 2) + 1)}
+        latencies = []
+        for tx_id in final_time:
+            throughput[math.floor(final_time[tx_id][1])] += 1
+            latencies.append(final_time[tx_id][0])
+
+        # Time till everyone recieves
+
+        # Write performance results in a file
+        res_file = os.path.join(prefix, "times_perf.txt")
+        with open(res_file, 'w') as w_file:
+            w_file.write("Total operations: %d\n" % len(stats))
+            w_file.write("Number of peers: %d\n" % max(nums))
+            w_file.write("\n")
+
+            if os.getenv('TX_SEC'):
+                value = float(os.getenv('TX_SEC'))
+                w_file.write("System transaction rate: %d\n" % (max(nums) * value))
+            if os.getenv('IB_FANOUT'):
+                value = int(os.getenv('IB_FANOUT'))
+                w_file.write("Peer fanout: %d\n" % value)
+
+            w_file.write("Peak throughput: %d\n" % max(throughput.values()))
+            w_file.write("Avg throughput: %d\n" % np.mean(throughput.values()))
+            w_file.write("St dev throughput: %d\n" % np.stdev(throughput.values()))
+            w_file.write("Min throughput: %d\n" % min(throughput.values()))
+            w_file.write("\n")
+
+            w_file.write("Min round latency: %f\n" % min(latencies))
+            w_file.write("Mean round latency: %f\n" % np.mean(latencies))
+            w_file.write("St dev round latency: %f\n" % np.stdev(latencies))
+            w_file.write("Max round latency: %f\n" % max(latencies))
+            w_file.write("\n")
+
+            w_file.write("Time for all to recieve: %f\n" % min(stats))
+            w_file.write("Mean Time for all to recieve: %f\n" % np.mean(stats))
+            w_file.write("St dev Time for all to recieve: %f\n" % np.stdev(stats))
+            w_file.write("Max Time for all to recieve: %f\n" % max(stats))
+            w_file.write("\n")
+
+            w_file.write("Count max vals: %f\n" % nums.count(max(nums)))
+
     def aggregate_databases(self):
         aggregation_path = os.path.join(os.environ['PROJECT_DIR'], 'output', 'sqlite')
         if not os.path.exists(aggregation_path):
@@ -62,7 +156,8 @@ class TrustchainStatisticsParser(StatisticsParser):
 
         block_stat_file = os.path.join(prefix, postfix + "agg.csv")
         with open(block_stat_file, "w") as t_file:
-            writer = csv.DictWriter(t_file, ['time', 'transaction', 'type', 'seq_num', 'peer_ids', 'seen_by'])
+            writer = csv.DictWriter(t_file, ['time', 'transaction',
+                                             'type', 'seq_num', 'peer_ids', 'seen_by'])
             writer.writeheader()
             while os.path.exists(os.path.join(prefix, postfix + str(index) + '.csv')):
                 with open(os.path.join(prefix, postfix + str(index) + '.csv')) as read_file:
@@ -388,9 +483,10 @@ class TrustchainStatisticsParser(StatisticsParser):
             w_file.write("Failed transactions/ Not seen by the source: %d\n" % failed)
 
     def run(self):
-        self.aggregate_transactions()
-        self.aggregate_statuses()
-        self.write_perf_results()
+        self.aggregate_trustchain_times()
+        #self.aggregate_transactions()
+        #self.aggregate_statuses()
+        #self.write_perf_results()
         self.aggregate_databases()
         self.write_blocks_to_file()
         self.aggregate_trustchain_balances()
