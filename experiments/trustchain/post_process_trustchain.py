@@ -59,7 +59,7 @@ class TrustchainStatisticsParser(StatisticsParser):
             if l_seq != 0:
                 # This is confirmation block
                 tx_id = (b_id, l_seq)
-                start_time = min(agg_block_time[(b_id, l_seq, l_id, 0)].values())
+                start_time = min(agg_block_time[str((b_id, l_seq, l_id, 0))].values())
                 end_time = min(agg_block_time[block_id].values())
                 if tx_id not in final_time:
                     final_time[tx_id] = (end_time - start_time, end_time)
