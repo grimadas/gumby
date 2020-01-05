@@ -46,14 +46,16 @@ class TrustchainStatisticsParser(StatisticsParser):
                         if block_id not in agg_block_time:
                             agg_block_time[block_id] = {}
                         agg_block_time[block_id][index] = time
-                if self.do_cleanup:
-                    os.remove(os.path.join(prefix, postfix + str(index) + '.csv'))
+                #if self.do_cleanup:
+                    #os.remove(os.path.join(prefix, postfix + str(index) + '.csv'))
                 index += 1
 
         stats = []
         nums = []
 
         for block_id in agg_block_time:
+            print(block_id)
+            print(len(block_id))
             b_id, seq, l_id, l_seq = block_id
             if l_seq != 0:
                 # This is confirmation block
