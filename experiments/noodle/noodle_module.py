@@ -237,13 +237,17 @@ class NoodleModule(IPv8OverlayExperimentModule):
             deferLater(reactor, delay, self.overlay.transfer, peer, 1000000000000)
 
     @experiment_callback
-    def start_creating_transactions(self):
+    def write_submit_tx_start_time(self):
         if not self.did_write_start_time:
             # Write the start time to a file
             submit_tx_start_time = int(round(time.time() * 1000))
             with open("submit_tx_start_time.txt", "w") as out_file:
                 out_file.write("%d" % submit_tx_start_time)
             self.did_write_start_time = True
+
+    @experiment_callback
+    def start_creating_transactions(self):
+        self.write_submit_tx_start_time()
 
         self._logger.info("Starting transactions...")
         total_peers = len(self.all_vars.keys())

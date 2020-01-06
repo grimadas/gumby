@@ -10,6 +10,7 @@
 @0:10 set_validation_range 5
 @0:18 mint
 @0:20 minter_send_to_all
+@0:30 write_submit_tx_start_time
 @0:30.009000 transfer 42 12141887 {56}
 @0:30.084000 transfer 42 1043361 {106}
 @0:30.101000 transfer 35 1808115307 {124}
