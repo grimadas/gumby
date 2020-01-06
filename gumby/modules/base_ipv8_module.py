@@ -129,7 +129,7 @@ class BaseIPv8Module(ExperimentModule):
         config.set_version_checker_enabled(False)
         config.set_bootstrap_enabled(False)
         config.set_popularity_community_enabled(False)
-        config.set_ipv8_use_raw_socket(True)
+        #config.set_ipv8_use_raw_socket(True)
         return config
 
     @classmethod
