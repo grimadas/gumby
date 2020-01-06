@@ -466,7 +466,7 @@ class NoodleModule(IPv8OverlayExperimentModule):
                                 block_type=b'test', transaction=transaction,
                                 double_spend_block=attached_block)
 
-    def transfer(self, peer, spend_value):
+    def transfer_tokens(self, peer, spend_value):
 
         dest_peer_id = self.experiment.get_peer_id(peer.address[0], peer.address[1])
         self._logger.debug("Making spend to peer %s (value: %f)", dest_peer_id, spend_value)
