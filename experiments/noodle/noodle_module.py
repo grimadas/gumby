@@ -90,6 +90,10 @@ class NoodleModule(IPv8OverlayExperimentModule):
             self.overlay.settings.security_mode = SecurityMode.AUDIT
         if os.getenv('RISK'):
             self.overlay.settings.risk = float(os.getenv('RISK'))
+        if os.getenv('TRANSFER_QUEUE_INTERVAL'):
+            self.overlay.settings.transfer_queue_interval = int(os.getenv('TRANSFER_QUEUE_INTERVAL'))
+        if os.getenv('BLOCK_QUEUE_INTERVAL'):
+            self.overlay.settings.block_queue_interval = int(os.getenv('BLOCK_QUEUE_INTERVAL'))
 
         self.overlay.persistence.do_commit = False
 
