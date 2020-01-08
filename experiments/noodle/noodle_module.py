@@ -71,8 +71,7 @@ class NoodleModule(IPv8OverlayExperimentModule):
         self.tribler_config.set_trustchain_enabled(False)
 
     def on_ipv8_available(self, _):
-        # Disable threadpool messages
-        self.overlay._use_main_thread = True
+        self.overlay._use_main_thread = False
 
     @experiment_callback
     def init_noodle_settings(self):
