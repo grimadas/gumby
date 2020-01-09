@@ -93,6 +93,8 @@ class NoodleModule(IPv8OverlayExperimentModule):
             self.overlay.settings.transfer_queue_interval = int(os.getenv('TRANSFER_QUEUE_INTERVAL'))
         if os.getenv('BLOCK_QUEUE_INTERVAL'):
             self.overlay.settings.block_queue_interval = int(os.getenv('BLOCK_QUEUE_INTERVAL'))
+        if os.getenv('AUDIT_RESPONSE_QUEUE_INTERVAL'):
+            self.overlay.settings.audit_response_queue_interval = int(os.getenv('AUDIT_RESPONSE_QUEUE_INTERVAL'))
 
         self.overlay.persistence.do_commit = False
 
@@ -505,6 +507,10 @@ class NoodleModule(IPv8OverlayExperimentModule):
         # Dump outstanding audit proofs
         with open("outstanding_proof_requests.txt", "w") as proof_requests_file:
             proof_requests_file.write(json.dumps(self.overlay.proof_requests))
+
+        print("Items in transfer queue: %d" % len(self.overlay.transfer_queue.queue))
+        print("Items in incoming block queue: %d" % len(self.overlay.incoming_block_queue.queue))
+        print("Items in audit response queue: %d" % len(self.overlay.audit_response_queue.queue))
 
     @experiment_callback
     def write_trustchain_statistics(self):
