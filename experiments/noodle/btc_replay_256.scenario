@@ -100011,8 +100011,8 @@
 @0:89.999000 transfer 27 974795 {114}
 @0:89.999000 transfer 74 200998 {184}
 @0:90.000000 transfer 106 52894928 {175}
-@0:95 commit_block_times
-@0:95 write_overlay_statistics
-@0:95 write_noodle_stats
-@0:100 stop_session
+@0:100 commit_block_times
+@0:100 write_overlay_statistics
+@0:100 write_noodle_stats
+@0:105 stop_session
 @0:110 stop
