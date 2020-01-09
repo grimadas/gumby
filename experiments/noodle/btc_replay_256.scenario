@@ -100011,7 +100011,6 @@
 @0:89.999000 transfer 27 974795 {114}
 @0:89.999000 transfer 74 200998 {184}
 @0:90.000000 transfer 106 52894928 {175}
-@0:31 start_periodic_mem_flush
 @0:95 commit_block_times
 @0:95 write_overlay_statistics
 @0:95 write_noodle_stats
