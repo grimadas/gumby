@@ -12,8 +12,6 @@ epollreactor.install()
 
 from twisted.internet import reactor
 
-reactor.suggestThreadPoolSize(1)
-
 from gumby.instrumentation import init_instrumentation
 from gumby.log import setupLogging
 from gumby.sync import ExperimentClientFactory, ExperimentServiceFactory
