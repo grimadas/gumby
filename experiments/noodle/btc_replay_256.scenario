@@ -1,9 +1,7 @@
 &module gumby.modules.tribler_module.TriblerModule
 &module experiments.noodle.noodle_module.NoodleModule
-&module gumby.modules.profile_module.ProfileModule
 
 @0:0 isolate_ipv8_overlay NoodleCommunity
-@0:1 start_yappi {75}
 @0:2 start_session
 @0:5 init_block_writer
 @0:6 init_noodle_settings
@@ -100018,5 +100016,4 @@
 @0:95 write_overlay_statistics
 @0:95 write_noodle_stats
 @0:100 stop_session
-@0:105 stop_yappi {75}
 @0:110 stop
