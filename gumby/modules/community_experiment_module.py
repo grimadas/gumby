@@ -1,7 +1,7 @@
 import os
 from base64 import b64encode, b64decode
 from os import environ
-from random import Random, random
+from random import Random, random, sample
 from socket import gethostbyname
 
 import networkx as nx
@@ -197,6 +197,19 @@ class IPv8OverlayExperimentModule(ExperimentModule):
                     peer_val = self.experiment.get_peer_ip_port_by_id(str(peer_id))
                     self._logger.info("Peer %s not connected/Reconnecting with value %s", peer_id, peer_val)
                     self.overlay.walk_to(peer_val)
+
+    @experiment_callback
+    def introduce_to_random_peers(self):
+        """
+        Introduce to the bootstrap peers
+        """
+        # Choose bootstrap peers
+        num_nodes = len(self.all_vars.keys())
+        if os.getenv('AVG_DEG'):
+            avg_degree = int(os.getenv('AVG_DEG'))
+        else:
+            avg_degree = 20
+        self.introduce_peers(max_peers=avg_degree)
 
     @experiment_callback
     def introduce_peers(self, max_peers=None, excluded_peers=None):
