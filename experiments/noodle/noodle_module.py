@@ -71,8 +71,7 @@ class NoodleModule(IPv8OverlayExperimentModule):
         self.tribler_config.set_trustchain_enabled(False)
 
     def on_ipv8_available(self, _):
-        # Disable threadpool messages
-        self.overlay._use_main_thread = True
+        self.overlay._use_main_thread = False
 
     @experiment_callback
     def init_noodle_settings(self):
@@ -90,6 +89,12 @@ class NoodleModule(IPv8OverlayExperimentModule):
             self.overlay.settings.security_mode = SecurityMode.AUDIT
         if os.getenv('RISK'):
             self.overlay.settings.risk = float(os.getenv('RISK'))
+        if os.getenv('TRANSFER_QUEUE_INTERVAL'):
+            self.overlay.settings.transfer_queue_interval = int(os.getenv('TRANSFER_QUEUE_INTERVAL'))
+        if os.getenv('BLOCK_QUEUE_INTERVAL'):
+            self.overlay.settings.block_queue_interval = int(os.getenv('BLOCK_QUEUE_INTERVAL'))
+        if os.getenv('AUDIT_RESPONSE_QUEUE_INTERVAL'):
+            self.overlay.settings.audit_response_queue_interval = int(os.getenv('AUDIT_RESPONSE_QUEUE_INTERVAL'))
 
         self.overlay.persistence.do_commit = False
 
@@ -218,7 +223,7 @@ class NoodleModule(IPv8OverlayExperimentModule):
             self._logger.info("I'm not a minter - refusing to mint!")
             return
 
-        self.overlay.mint()
+        self.overlay.mint(value=100000000000000000)
 
     @experiment_callback
     def minter_send_to_all(self):
@@ -234,16 +239,20 @@ class NoodleModule(IPv8OverlayExperimentModule):
         peers = self.overlay.get_all_communities_peers()
         for peer in peers:
             delay = (1.0 / len(peers)) * int(self.experiment.get_peer_id(peer.address[0], peer.address[1]))
-            deferLater(reactor, delay, self.transfer, peer, 1000)
+            deferLater(reactor, delay, self.overlay.transfer, peer, 100000000000000)
 
     @experiment_callback
-    def start_creating_transactions(self):
+    def write_submit_tx_start_time(self):
         if not self.did_write_start_time:
             # Write the start time to a file
             submit_tx_start_time = int(round(time.time() * 1000))
             with open("submit_tx_start_time.txt", "w") as out_file:
                 out_file.write("%d" % submit_tx_start_time)
             self.did_write_start_time = True
+
+    @experiment_callback
+    def start_creating_transactions(self):
+        self.write_submit_tx_start_time()
 
         self._logger.info("Starting transactions...")
         total_peers = len(self.all_vars.keys())
@@ -378,7 +387,7 @@ class NoodleModule(IPv8OverlayExperimentModule):
         """
         Request a random signature from one of your known verified peers
         """
-        self.transfer(choice(list(self.overlay.get_peers())), random())
+        self.overlay.transfer(choice(list(self.overlay.get_peers())), random())
 
     def request_noodle_random_community_signature(self):
         """
@@ -387,7 +396,7 @@ class NoodleModule(IPv8OverlayExperimentModule):
         minters = set(self.overlay.get_peers())
         peers = self.overlay.get_all_communities_peers()
         peers.update(minters)
-        self.transfer(choice(list(peers)), 1)
+        self.overlay.transfer(choice(list(peers)), 1)
 
     def request_noodle_fixed_community_signature(self):
         """
@@ -395,7 +404,7 @@ class NoodleModule(IPv8OverlayExperimentModule):
         """
         target_peer_id = self.my_id % len(self.all_vars.keys()) + 1
         target_peer = self.get_peer(str(target_peer_id))
-        self.transfer(target_peer, 1)
+        self.overlay.transfer(target_peer, 1)
 
     @experiment_callback
     def request_noodle_all_random_signature(self):
@@ -406,7 +415,7 @@ class NoodleModule(IPv8OverlayExperimentModule):
 
         eligible_peers = set(self.experiment.get_peers()) - {str(self.my_id)}
         peer_id = choice(list(eligible_peers))
-        self.transfer(self.get_peer(peer_id), random())
+        self.overlay.transfer(self.get_peer(peer_id), random())
 
     @experiment_callback
     def request_random_signature(self, attach_to_block=None):
@@ -466,25 +475,11 @@ class NoodleModule(IPv8OverlayExperimentModule):
                                 block_type=b'test', transaction=transaction,
                                 double_spend_block=attached_block)
 
-    def transfer(self, peer, spend_value):
-
-        dest_peer_id = self.experiment.get_peer_id(peer.address[0], peer.address[1])
-        self._logger.debug("Making spend to peer %s (value: %f)", dest_peer_id, spend_value)
-
-        val = self.overlay.prepare_spend_transaction(peer.public_key.key_to_bin(), spend_value)
-        if not val:
-            self._logger.warning("No tokens to spend. Waiting for tokens")
-            return
-
-        next_hop_peer, tx = val
-        next_hop_peer_id = self.experiment.get_peer_id(next_hop_peer.address[0], next_hop_peer.address[1])
-        if next_hop_peer_id != dest_peer_id:
-            # Multi-hop payment, add condition + nonce
-            nonce = self.overlay.persistence.get_new_peer_nonce(peer.public_key.key_to_bin())
-            condition = hexlify(peer.public_key.key_to_bin()).decode()
-            tx.update({'nonce': nonce, 'condition': condition})
-        self.overlay.sign_block(next_hop_peer, next_hop_peer.public_key.key_to_bin(),
-                                block_type=b'spend', transaction=tx)
+    @experiment_callback
+    def transfer(self, peer_id, value):
+        value = int(value)
+        peer = self.get_peer(peer_id)
+        self.overlay.transfer(peer, value)
 
     def check_num_blocks_in_db(self):
         """
@@ -503,15 +498,17 @@ class NoodleModule(IPv8OverlayExperimentModule):
     @experiment_callback
     def commit_block_times(self):
         self._logger.error("Commit block times to the file %s", self.overlay.persistence.block_file)
-        if self.session.config.use_trustchain_memory_db():
-            self._logger.error("Commit block times to the file %s", self.overlay.persistence.block_file)
-            self.overlay.persistence.commit_block_times()
+        self.overlay.persistence.commit_block_times()
 
     @experiment_callback
     def write_noodle_stats(self):
         # Dump outstanding audit proofs
         with open("outstanding_proof_requests.txt", "w") as proof_requests_file:
             proof_requests_file.write(json.dumps(self.overlay.proof_requests))
+
+        print("Items in transfer queue: %d" % len(self.overlay.transfer_queue.queue))
+        print("Items in incoming block queue: %d" % len(self.overlay.incoming_block_queue.queue))
+        print("Items in audit response queue: %d" % len(self.overlay.audit_response_queue.queue))
 
     @experiment_callback
     def write_trustchain_statistics(self):
