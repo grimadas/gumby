@@ -195,8 +195,7 @@ class ExperimentClient(LineReceiver):
     def proto_running(self, line):
         if line.startswith(b"msg"):
             _, from_peer_id, msg_type, msg = line.strip().split(b':', 3)
-            self._logger.debug("Received message with type %s from peer %d: %s",
-                               msg_type.decode(), int(from_peer_id), msg.decode())
+            self._logger.debug("Received message with type %s from peer %d: %s", msg_type.decode(), int(from_peer_id), msg.decode())
             if self.message_callback:
                 self.message_callback.on_message(int(from_peer_id), msg_type, msg)
 
