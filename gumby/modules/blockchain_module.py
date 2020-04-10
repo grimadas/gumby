@@ -16,7 +16,8 @@ class BlockchainModule(ExperimentModule):
         self.transactions_manager = None
 
     def is_client(self):
-        return self.my_id > self.num_validators
+        my_peer_id = self.experiment.scenario_runner._peernumber
+        return my_peer_id > self.num_validators
 
     def on_all_vars_received(self):
         super(BlockchainModule, self).on_all_vars_received()
