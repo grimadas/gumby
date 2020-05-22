@@ -31,10 +31,7 @@ class MockChainState(ChainState):
         print('Adding block to state')
         if block.type == b'edit':
             print('Transaction is edit')
-            print(block.transaction)
-            print(block.transaction['size'])
-            print(prev_state)
-            delta = block.transaction['size'] - prev_state['vals'][0]
+            delta = int(block.transaction['size']) - prev_state['vals'][0]
             print('Delta calc')
             sh_hash = key_to_id(block.hash)
             peer = key_to_id(block.public_key)
@@ -49,7 +46,7 @@ class MockChainState(ChainState):
 
             return {'total': total,
                     'front': [sh_hash],
-                    'vals': [block.transaction['size'], delta, peer],
+                    'vals': [int(block.transaction['size']), delta, peer],
                     'stakes': new_stakes
                     }
 
