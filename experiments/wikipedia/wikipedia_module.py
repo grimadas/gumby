@@ -105,17 +105,21 @@ class NoodleModule(IPv8OverlayExperimentModule):
     def sub_communities(self, coms):
         new_coms = [str.encode(k) for k in coms.split(',')]
         self.overlay.subscribe_to_multi_community(new_coms)
+        self._logger.info("Subing to communities an edit %s", new_coms)
         for com_id in new_coms:
+            self._logger.info("Adding chain state ")
             self.overlay.persistence.add_chain_state(com_id, MockChainState('sum'))
 
     @experiment_callback
     def edit(self, page_id, size, rev_id):
         comm_id = str.encode(page_id)
         transaction = {"rev_id": rev_id, "size": size}
+        self._logger.info("Creating an edit %s", transaction)
         self.overlay.self_sign_block(block_type=b'edit', transaction=transaction, com_id=comm_id)
 
     @experiment_callback
     def revert(self, page_id, reverted, rever_to):
         comm_id = str.encode(page_id)
         transaction = {"revert": reverted, "revert_to": rever_to}
+        self._logger.info("Creating an revert %s", transaction)
         self.overlay.self_sign_block(block_type=b'revert', transaction=transaction, com_id=comm_id)
