@@ -6,7 +6,6 @@ from ipv8.peerdiscovery.discovery import RandomWalk
 
 
 class CommunityLauncher(object):
-
     """
     Object in charge of preparing a Community for loading in IPv8.
     """
@@ -197,6 +196,22 @@ class TrustChainCommunityLauncher(IPv8CommunityLauncher):
             from experiments.trustchain.trustchain_mem_db import TrustchainMemoryDatabase
             community.persistence = TrustchainMemoryDatabase(session.config.get_state_dir(), 'trustchain')
             community.persistence.original_db = orig_db
+
+
+class PlexusCommunityLauncher(IPv8CommunityLauncher):
+
+    def should_launch(self, session):
+        return True
+
+    def get_overlay_class(self):
+        from ipv8.attestation.backbone.community import PlexusCommunity
+        return PlexusCommunity
+
+    def get_my_peer(self, ipv8, session):
+        return Peer(session.trustchain_keypair)
+
+    def get_kwargs(self, session):
+        return {'working_directory': session.config.get_state_dir()}
 
 
 class NoodleCommunityLauncher(IPv8CommunityLauncher):

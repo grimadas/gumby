@@ -55,6 +55,7 @@ class BaseIPv8Module(ExperimentModule):
         loader.set_launcher(IPv8DiscoveryCommunityLauncher())
         loader.set_launcher(TrustChainCommunityLauncher())
         loader.set_launcher(NoodleCommunityLauncher())
+        loader.set_launcher(PlexusCommunityLauncher())
         loader.set_launcher(TriblerTunnelCommunityLauncher())
         loader.set_launcher(PopularityCommunityLauncher())
         loader.set_launcher(DHTCommunityLauncher())

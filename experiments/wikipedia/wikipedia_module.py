@@ -3,7 +3,7 @@ import os
 from gumby.experiment import experiment_callback
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
 from gumby.modules.experiment_module import static_module
-from ipv8.attestation.backbone.community import NoodleCommunity
+from ipv8.attestation.backbone.community import PlexusCommunity
 from ipv8.attestation.backbone.datastore.consistency import ChainState
 from ipv8.attestation.backbone.datastore.utils import key_to_id
 
@@ -80,26 +80,9 @@ class MockChainState(ChainState):
             return old_state
 
 @static_module
-class NoodleModule(IPv8OverlayExperimentModule):
+class PlexusModule(IPv8OverlayExperimentModule):
     def __init__(self, experiment):
-        super(NoodleModule, self).__init__(experiment, NoodleCommunity)
-        self.request_signatures_lc = None
-        self.block_stat_file = None
-        self.request_ds_lc = None
-        self.did_write_start_time = False
-        self.tx_lc = None
-
-        if os.getenv('TX_RATE'):
-            self.tx_rate = int(os.getenv('TX_RATE'))
-        else:
-            self.tx_rate = 64
-
-    def on_id_received(self):
-        super(NoodleModule, self).on_id_received()
-        self.tribler_config.set_trustchain_enabled(False)
-
-    def on_ipv8_available(self, _):
-        self.overlay._use_main_thread = False
+        super().__init__(experiment, PlexusCommunity)
 
     @experiment_callback
     def sub_communities(self, coms):
