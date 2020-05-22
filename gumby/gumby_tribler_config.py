@@ -12,7 +12,6 @@ class GumbyTriblerConfig(TriblerConfig):
 
         self.config['trustchain']['enabled'] = True
         self.config['trustchain']['memory_db'] = False
-        self.config['noodle']['memory_db'] = False
         self.config['ipv8']['discovery'] = False
 
     def set_ipv8_discovery(self, value):
