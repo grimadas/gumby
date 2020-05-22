@@ -28,17 +28,13 @@ class MockChainState(ChainState):
         @return: Return new_state
         """
         # get from  front last value
-        print('Adding block to state')
         if block.type == b'edit':
-            print('Transaction is edit')
             delta = int(block.transaction['size']) - prev_state['vals'][0]
-            print('Delta calc')
             sh_hash = key_to_id(block.hash)
             peer = key_to_id(block.public_key)
             total = prev_state['total'] + abs(delta)
             new_stakes = dict()
             new_stakes.update(prev_state['stakes'])
-            print('Stakes updated')
             if peer not in prev_state['stakes']:
                 new_stakes[peer] = abs(delta)
             else:
