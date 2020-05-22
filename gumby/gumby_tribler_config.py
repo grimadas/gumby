@@ -10,7 +10,7 @@ class GumbyTriblerConfig(TriblerConfig):
     def __init__(self, state_dir, config_file=None):
         super(GumbyTriblerConfig, self).__init__(state_dir, config_file=config_file)
 
-        self.config['trustchain']['enabled'] = True
+        self.config['trustchain']['enabled'] = False
         self.config['trustchain']['memory_db'] = False
         self.config['ipv8']['discovery'] = False
 

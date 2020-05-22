@@ -217,7 +217,7 @@ class PlexusCommunityLauncher(IPv8CommunityLauncher):
 class NoodleCommunityLauncher(IPv8CommunityLauncher):
 
     def should_launch(self, session):
-        return session.config.get_noodle_enabled()
+        return False #session.config.get_noodle_enabled()
 
     def get_overlay_class(self):
         from ipv8.attestation.noodle.community import NoodleCommunity
