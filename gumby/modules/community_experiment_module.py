@@ -127,7 +127,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
             print("Connecting to all ")
             for peer_id in self.all_vars.keys():
                 if int(peer_id) != self.my_id and int(peer_id) not in excluded_peers_list:
-                    delta = 8 * random()
+                    delta =  random()
                     run_task(self.overlay.walk_to, self.experiment.get_peer_ip_port_by_id(peer_id), delay=delta)
         else:
             # Walk to a number of peers
@@ -135,7 +135,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
                               if int(peer_id) not in excluded_peers_list and int(peer_id) != self.my_id]
             rand_peer_ids = random.sample(eligible_peers, int(max_peers))
             for rand_peer_id in rand_peer_ids:
-                delta = 8 * random()
+                delta =  random()
                 run_task(self.overlay.walk_to, self.experiment.get_peer_ip_port_by_id(rand_peer_id), delay=delta)
 
     @experiment_callback
