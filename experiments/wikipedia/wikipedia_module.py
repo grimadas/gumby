@@ -104,6 +104,8 @@ class NoodleModule(IPv8OverlayExperimentModule):
     @experiment_callback
     def sub_communities(self, coms):
         new_coms = [str.encode(k) for k in coms.split(',')]
+        print(coms)
+        print(new_coms)
         self.overlay.subscribe_to_multi_community(new_coms)
         self._logger.info("Subing to communities an edit %s", new_coms)
         for com_id in new_coms:

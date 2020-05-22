@@ -124,6 +124,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
 
         if not max_peers:
             # bootstrap the peer introduction, ensuring everybody knows everybody to start off with.
+            print("Connecting to all ")
             for peer_id in self.all_vars.keys():
                 if int(peer_id) != self.my_id and int(peer_id) not in excluded_peers_list:
                     delta = 8 * random()
