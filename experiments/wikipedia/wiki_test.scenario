@@ -5,7 +5,7 @@
 @0:2 start_session
 @0:9 disable_max_peers
 @0:10 sub_communities 1,2,3
-@0:10 introduce_peers
+@0:15 introduce_all_peers
 @0:20.3669 edit 1 100 1597481 {1}
 @0:21.3669 edit 1 150 1597482 {1}
 @0:22.3669 edit 1 200 1597483 {2}
