@@ -9,6 +9,6 @@
 @0:20.3669 edit 1 100 1597481 {1}
 @0:21.3669 edit 1 150 1597482 {1}
 @0:22.3669 edit 1 200 1597483 {2}
-@0:25 write_overlay_statistics
-@0:27 stop_session
-@0:28 stop
+@0:30 write_overlay_statistics
+@0:32 stop_session
+@0:35 stop
