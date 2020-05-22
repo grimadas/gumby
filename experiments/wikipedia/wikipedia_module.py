@@ -31,6 +31,9 @@ class MockChainState(ChainState):
         print('Adding block to state')
         if block.type == b'edit':
             print('Transaction is edit')
+            print(block.transaction)
+            print(block.transaction['size'])
+            print(prev_state)
             delta = block.transaction['size'] - prev_state['vals'][0]
             print('Delta calc')
             sh_hash = key_to_id(block.hash)
