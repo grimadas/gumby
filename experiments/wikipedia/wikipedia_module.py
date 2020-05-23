@@ -55,7 +55,7 @@ class WikiChainState(ChainState):
                     }
         elif block.type == b'revert':
             # revert to state with of specific revision
-            #state_num = self.chain.rev2num[block.transaction['revert_to']]
+            # state_num = self.chain.rev2num[block.transaction['revert_to']]
             state_num = prev_state['num'] - 1 if prev_state['num'] > 0 else prev_state['num']
             return self.chain.get_state(state_num, self.name)
 
@@ -112,6 +112,11 @@ class PlexusModule(IPv8OverlayExperimentModule):
     def commit_txs(self):
         block_file = 'blocks.csv'
         self.overlay.persistence.commit_block_times(block_file)
+
+    @experiment_callback
+    def commit_states(self):
+        state_file = 'states.csv'
+        self.overlay.persistence.commit_states(state_file)
 
     @experiment_callback
     def sub_communities(self, coms):
