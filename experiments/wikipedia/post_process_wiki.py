@@ -6,7 +6,6 @@ import os
 import sys
 
 from gumby.post_process_blockchain import BlockchainTransactionsParser
-from scripts.trustchain_database_reader import GumbyDatabaseAggregator
 
 
 class PlexusStatisticsParser(BlockchainTransactionsParser):
