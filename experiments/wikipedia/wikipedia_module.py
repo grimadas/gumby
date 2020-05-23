@@ -8,7 +8,7 @@ from ipv8.attestation.backbone.datastore.consistency import ChainState
 from ipv8.attestation.backbone.datastore.utils import key_to_id
 
 
-class MockChainState(ChainState):
+class WikiChainState(ChainState):
 
     def __init__(self, name, chain=None):
         super().__init__(name)
@@ -70,9 +70,6 @@ class MockChainState(ChainState):
         if not old_state:
             # There are no conflicts
             return new_state
-        if not new_state:
-            print('New state is NONE')
-            return old_state
 
         # Check if there are actually conflicting by verifying the fronts
         merged_state = dict()
@@ -83,7 +80,7 @@ class MockChainState(ChainState):
             merged_state['total'] = old_state['total'] + abs(new_state['vals'][1])
             merged_state['vals'] = [old_state['vals'][0] + new_state['vals'][1],
                                     old_state['vals'][1] + new_state['vals'][1]]
-            p = new_state['vals'][2]
+            p = new_state['peers'][0]
             delta = new_state['vals'][1]
             merged_state['stakes'] = dict()
             merged_state['stakes'].update(old_state['stakes'])
@@ -115,7 +112,7 @@ class PlexusModule(IPv8OverlayExperimentModule):
         self._logger.info("Subing to communities an edit %s", new_coms)
         for com_id in new_coms:
             self._logger.info("Adding chain state ")
-            self.overlay.persistence.add_chain_state(com_id, MockChainState('sum'))
+            self.overlay.persistence.add_chain_state(com_id, WikiChainState('page'))
 
     @experiment_callback
     def edit(self, page_id, size, rev_id):
