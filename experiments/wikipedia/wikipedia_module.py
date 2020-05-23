@@ -20,7 +20,7 @@ class WikiChainState(ChainState):
         @return: Fresh new state
         """
         self.chain.rev2num = dict()
-        return {'num': 0 ,  'total': 0, 'vals': [0, 0], 'front': list(), 'stakes': dict(), 'peers': list()}
+        return {'num': 0, 'total': 0, 'vals': [0, 0], 'front': list(), 'stakes': dict(), 'peers': list()}
 
     def apply_block(self, prev_state, block):
         """
@@ -35,7 +35,7 @@ class WikiChainState(ChainState):
             sh_hash = key_to_id(block.hash)
             peer = key_to_id(block.public_key)
             # Persist revision id
-            current_num = prev_state['num']+1
+            current_num = prev_state['num'] + 1
             self.chain.rev2num[block.transaction['rev_id']] = current_num
 
             total = prev_state['total'] + abs(delta)
@@ -45,7 +45,6 @@ class WikiChainState(ChainState):
                 new_stakes[peer] = abs(delta)
             else:
                 new_stakes[peer] += abs(delta)
-
 
             return {'num': current_num,
                     'total': total,
@@ -58,7 +57,6 @@ class WikiChainState(ChainState):
             # revert to state with of specific revision
             state_num = self.chain.rev2num[block.transaction['revert_to']]
             return self.chain.get_state(state_num, self.name)
-
 
     def merge(self, old_state, new_state):
         """
@@ -89,6 +87,10 @@ class WikiChainState(ChainState):
             else:
                 merged_state['stakes'][p] += abs(delta)
             merged_state['stakes'] = sorted(merged_state['stakes'].items())
+            if old_state['num'] != new_state['num']:
+                print('Nums not equal')
+                print(old_state, new_state)
+            merged_state['num'] = max(old_state['num'], new_state['num'])
 
             return merged_state
         else:
@@ -103,7 +105,7 @@ class PlexusModule(IPv8OverlayExperimentModule):
     def page_to_key(self, page_id):
         comm_id = str.encode(page_id)
         add = b'0' * (74 - len(comm_id))
-        return comm_id+add
+        return comm_id + add
 
     @experiment_callback
     def sub_communities(self, coms):
