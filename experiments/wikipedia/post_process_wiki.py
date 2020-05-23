@@ -2,14 +2,10 @@
 from __future__ import print_function
 
 import csv
-import json
 import os
-import statistics as np
 import sys
-from binascii import hexlify
 
 from gumby.post_process_blockchain import BlockchainTransactionsParser
-
 from scripts.trustchain_database_reader import GumbyDatabaseAggregator
 
 
@@ -17,18 +13,6 @@ class PlexusStatisticsParser(BlockchainTransactionsParser):
     """
     Parse Noodle statistics after an experiment has been completed.
     """
-
-    def __init__(self, node_directory):
-        super(PlexusStatisticsParser, self).__init__(node_directory)
-        self.aggregator = GumbyDatabaseAggregator(os.path.join(os.environ['PROJECT_DIR'], 'output'))
-        self.tx_propagation_info = {}  # Keep track of whether a transaction has been seen by the counterparty / confirmed by the initiator
-
-    def aggregate_databases(self):
-        aggregation_path = os.path.join(os.environ['PROJECT_DIR'], 'output', 'sqlite')
-        if not os.path.exists(aggregation_path):
-            os.makedirs(aggregation_path)
-
-        self.aggregator.combine_databases()
 
     def parse_transactions(self):
         """
