@@ -10,15 +10,17 @@ from ipv8.attestation.backbone.datastore.utils import key_to_id
 
 class MockChainState(ChainState):
 
-    def __init__(self, name):
+    def __init__(self, name, chain=None):
         super().__init__(name)
+        self.chain = chain
 
     def init_state(self):
         """
         Initialize state when there no blocks
         @return: Fresh new state
         """
-        return {'total': 0, 'vals': [0, 0], 'front': list(), 'stakes': dict()}
+        self.chain.rev2num = dict()
+        return {'num': 0 ,  'total': 0, 'vals': [0, 0], 'front': list(), 'stakes': dict(), 'peers': list()}
 
     def apply_block(self, prev_state, block):
         """
@@ -32,6 +34,10 @@ class MockChainState(ChainState):
             delta = int(block.transaction['size']) - prev_state['vals'][0]
             sh_hash = key_to_id(block.hash)
             peer = key_to_id(block.public_key)
+            # Persist revision id
+            current_num = prev_state['num']+1
+            self.chain.rev2num[block.transaction['rev_id']] = current_num
+
             total = prev_state['total'] + abs(delta)
             new_stakes = dict()
             new_stakes.update(prev_state['stakes'])
@@ -40,11 +46,19 @@ class MockChainState(ChainState):
             else:
                 new_stakes[peer] += abs(delta)
 
-            return {'total': total,
+
+            return {'num': current_num,
+                    'total': total,
                     'front': [sh_hash],
-                    'vals': [int(block.transaction['size']), delta, peer],
+                    'peers': [peer],
+                    'vals': [int(block.transaction['size']), delta],
                     'stakes': new_stakes
                     }
+        elif block.type == b'revert':
+            # revert to state with of specific revision
+            state_num = self.chain.rev2num[block.transaction['revert_to']]
+            return self.chain.get_state(state_num, self.name)
+
 
     def merge(self, old_state, new_state):
         """
@@ -56,12 +70,16 @@ class MockChainState(ChainState):
         if not old_state:
             # There are no conflicts
             return new_state
+        if not new_state:
+            print('New state is NONE')
+            return old_state
 
         # Check if there are actually conflicting by verifying the fronts
         merged_state = dict()
         if not set(new_state['front']).issubset(set(old_state['front'])):
             # merge fronts
             merged_state['front'] = sorted(list(set(old_state['front']) | set(new_state['front'])))
+            merged_state['peers'] = sorted(list(set(old_state['peers']) | set(new_state['peers'])))
             merged_state['total'] = old_state['total'] + abs(new_state['vals'][1])
             merged_state['vals'] = [old_state['vals'][0] + new_state['vals'][1],
                                     old_state['vals'][1] + new_state['vals'][1]]
@@ -110,5 +128,10 @@ class PlexusModule(IPv8OverlayExperimentModule):
     def revert(self, page_id, reverted, rever_to):
         comm_id = self.page_to_key(page_id)
         transaction = {"revert": reverted, "revert_to": rever_to}
-        self._logger.info("Creating an revert %s", transaction)
-        self.overlay.self_sign_block(block_type=b'revert', transaction=transaction, com_id=comm_id)
+        # Check that 'revert_to' exists
+        chain = self.overlay.persistence.get_chain(comm_id)
+        if not chain or not chain.rev2num or not chain.rev2num.get(rever_to):
+            print('Cannot create a revert ', transaction)
+        else:
+            self._logger.info("Creating an revert %s", transaction)
+            self.overlay.self_sign_block(block_type=b'revert', transaction=transaction, com_id=comm_id)
