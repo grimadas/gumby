@@ -55,7 +55,8 @@ class WikiChainState(ChainState):
                     }
         elif block.type == b'revert':
             # revert to state with of specific revision
-            state_num = self.chain.rev2num[block.transaction['revert_to']]
+            #state_num = self.chain.rev2num[block.transaction['revert_to']]
+            state_num = prev_state['num'] - 1 if prev_state['num'] > 0 else prev_state['num']
             return self.chain.get_state(state_num, self.name)
 
     def merge(self, old_state, new_state):
@@ -131,6 +132,5 @@ class PlexusModule(IPv8OverlayExperimentModule):
         chain = self.overlay.persistence.get_chain(comm_id)
         if not chain or not chain.rev2num or not chain.rev2num.get(rever_to):
             print('Cannot create a revert ', transaction)
-        else:
-            self._logger.info("Creating an revert %s", transaction)
-            self.overlay.self_sign_block(block_type=b'revert', transaction=transaction, com_id=comm_id)
+        self._logger.info("Creating an revert %s", transaction)
+        self.overlay.self_sign_block(block_type=b'revert', transaction=transaction, com_id=comm_id)
