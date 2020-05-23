@@ -119,6 +119,10 @@ class PlexusModule(IPv8OverlayExperimentModule):
         self.overlay.persistence.commit_states(state_file)
 
     @experiment_callback
+    def disable_max_peers(self):
+        self.overlay.max_peers = -1
+
+    @experiment_callback
     def sub_communities(self, coms):
         new_coms = [self.page_to_key(k) for k in coms.split(',')]
         self.overlay.subscribe_to_multi_community(new_coms)
