@@ -109,6 +109,11 @@ class PlexusModule(IPv8OverlayExperimentModule):
         return comm_id + add
 
     @experiment_callback
+    def commit_txs(self):
+        block_file = 'blocks.csv'
+        self.overlay.persistence.commit_block_times(block_file)
+
+    @experiment_callback
     def sub_communities(self, coms):
         new_coms = [self.page_to_key(k) for k in coms.split(',')]
         self.overlay.subscribe_to_multi_community(new_coms)
