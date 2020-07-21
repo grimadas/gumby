@@ -1,5 +1,5 @@
-&module gumby.modules.tribler_module.TriblerModule
-&module experiments.bami.bami_module.BamiModule
+&module gumby.modules.bami_module.BamiModule
+&module experiments.bami.bami_module.BamiExperiments
 
 @0:1 isolate_ipv8_overlay PaymentCommunity
 @0:2 start_session

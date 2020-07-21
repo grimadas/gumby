@@ -15,7 +15,7 @@ from gumby.modules.experiment_module import static_module
 
 
 @static_module
-class BamiModule(IPv8OverlayExperimentModule):
+class BamiExperiments(IPv8OverlayExperimentModule):
     def __init__(self, experiment):
         super().__init__(experiment, PaymentCommunity)
         self.request_signatures_lc = None
