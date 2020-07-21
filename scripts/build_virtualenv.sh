@@ -75,6 +75,18 @@ if [ -e $VENV/.completed.$SCRIPT_VERSION ]; then
     exit
 fi
 
+while getopts ":a:" opt; do
+  case $opt in
+    a)
+      ADDED_REQ=$OPTARG
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
 # If we compile for Python 3, we want to install a newer version since the version on the DAS5 is outdated.
 if [ ! -e ~/python3/bin/python3 ]; then
     pushd $HOME
@@ -320,6 +332,11 @@ aiohttp
 aiohttp_apispec
 yappi
 " > ~/requirements.txt
+
+# Add modular requirements
+if [ -n "$ADDED_REQ" ]; then
+  cat "$ADDED_REQ" >> ~/requirements.txt
+fi
 
 CFLAGS="$CFLAGS -I$VENV/include" LDFLAGS="$LDFLAGS -L$VENV/lib" pip install --upgrade -r ~/requirements.txt
 
