@@ -1,0 +1,17 @@
+&module gumby.modules.tribler_module.TriblerModule
+&module experiments.bami.bami_module.BamiModule
+
+@0:1 isolate_ipv8_overlay PaymentCommunity
+@0:2 start_session
+@0:5 track_all_blocks
+@0:10 introduce_peers max_peers=10
+@0:20 annotate group-forming
+@0:21 join_group 1
+@0:30 mint {1}
+@0:32 transfer 1 2 1 {1}
+@0:33 transfer 1 3 1 {1}
+@0:34 transfer 1 4 1 {1}
+@0:35 transfer 1 5 1 {1}
+@0:40 write_overlay_statistics
+@0:45 stop_session
+@0:50 stop
