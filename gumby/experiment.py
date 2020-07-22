@@ -110,10 +110,9 @@ class ExperimentClient(LineReceiver):
         chdir(my_dir)
         self._stats_file = open("statistics.log", 'w', buffering=1)
 
-        self._logger.info("Experiment modules", [t.__name__ for t in self.experiment_modules])
+        self._logger.info("Experiment modules")
         for module in self.experiment_modules:
             if module is not self:
-                self._logger.info("Module is not self", module.__name__)
                 module.on_id_received()
 
         for key, val in self.vars.items():
