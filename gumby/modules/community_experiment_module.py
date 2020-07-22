@@ -152,7 +152,8 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         keypair = generate_keypair_trustchain()
         pairfilename = self.tribler_config.get_trustchain_keypair_filename()
         enabled = self.tribler_config.get_trustchain_enabled()
-        self._logger.info('Config get trustchain keypair filename: ' + pairfilename,  str(enabled))
+        self._logger.info('Trustchain enabled: ' + str(enabled))
+        self._logger.info('Config get trustchain keypair filename: ' + pairfilename)
         save_keypair_trustchain(keypair, pairfilename)
         save_pub_key_trustchain(keypair, "%s.pub" % pairfilename)
 
