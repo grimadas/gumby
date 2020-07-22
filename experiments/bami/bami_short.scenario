@@ -1,7 +1,5 @@
-&module gumby.modules.bami_module.BamiModule
 &module experiments.bami.bami_module.BamiExperiments
 
-@0:1 isolate_ipv8_overlay PaymentCommunity
 @0:2 start_session
 @0:5 track_all_blocks
 @0:10 introduce_peers max_peers=10

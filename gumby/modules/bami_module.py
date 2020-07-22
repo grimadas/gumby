@@ -2,7 +2,6 @@ from ipv8.peer import Peer
 
 from gumby.modules.community_launcher import IPv8CommunityLauncher
 from gumby.modules.experiment_module import static_module
-from gumby.modules.isolated_community_loader import IsolatedIPv8CommunityLoader
 from gumby.modules.tribler_module import TriblerModule
 
 
