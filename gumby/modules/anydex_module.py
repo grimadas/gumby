@@ -61,6 +61,7 @@ class AnyDexModule(ExperimentModule):
         self.ipv8_port = None
         self.tribler_config = None
         self.session_id = environ['SYNC_HOST'] + environ['SYNC_PORT']
+        print('AnyDex module created')
         self.custom_ipv8_community_loader = self.create_ipv8_community_loader()
         self.ipv8_available = Future()
         self.ipv8 = None
@@ -81,10 +82,12 @@ class AnyDexModule(ExperimentModule):
             statistics_file.write(json.dumps(new_dict) + '\n')
 
     def on_id_received(self):
+        print('On id received for the AniDex')
         self.tribler_config = self.setup_config()
         super(AnyDexModule, self).on_id_received()
 
     def create_ipv8_community_loader(self):
+        print('Creating ipv8 community loader')
         loader = IsolatedIPv8CommunityLoader(self.session_id)
         loader.set_launcher(TrustChainCommunityLauncher())
         loader.set_launcher(MarketCommunityLauncher())
@@ -95,6 +98,7 @@ class AnyDexModule(ExperimentModule):
     @experiment_callback
     def start_session(self):
         from ipv8.configuration import get_default_configuration
+        print('Starting session')
 
         ipv8_config = get_default_configuration()
         ipv8_config['port'] = self.tribler_config.get_ipv8_port()

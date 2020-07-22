@@ -17,6 +17,7 @@ from gumby.modules.experiment_module import static_module
 @static_module
 class BamiExperiments(IPv8OverlayExperimentModule):
     def __init__(self, experiment):
+        print('Createing experiment session: bami')
         super().__init__(experiment, PaymentCommunity)
         self.request_signatures_lc = None
         self.num_blocks_in_db_task = None
@@ -101,6 +102,7 @@ class BamiExperiments(IPv8OverlayExperimentModule):
 
     @experiment_callback
     def track_all_blocks(self):
+        print('Tracking all blocks')
         # Open projects output directory and save blocks arrival time
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
 
