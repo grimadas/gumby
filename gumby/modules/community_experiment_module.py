@@ -145,7 +145,6 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         # Since the IPv8 source module is loaded before any community module, the IPv8 on_id_received has
         # already completed. This means that the tribler_config is now available. So any configuration should happen in
         # overrides of this function. (Be sure to call this super though!)
-        super(IPv8OverlayExperimentModule, self).on_id_received()
         self._logger.info('Id received: creating trustchain keys')
 
         # We need the IPv8 peer key at this point. However, the configured session is not started yet. So we
@@ -156,6 +155,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         save_pub_key_trustchain(keypair, "%s.pub" % pairfilename)
 
         self.vars['public_key'] = b64encode(keypair.pub().key_to_bin()).decode('utf-8')
+        super(IPv8OverlayExperimentModule, self).on_id_received()
 
     def on_ipv8_available(self, ipv8):
         # The IPv8 object is now available. This means that the tribler_config has been copy constructed into the
