@@ -146,10 +146,10 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         # already completed. This means that the tribler_config is now available. So any configuration should happen in
         # overrides of this function. (Be sure to call this super though!)
         super(IPv8OverlayExperimentModule, self).on_id_received()
+        self._logger.info('Id received: creating trustchain keys')
 
         # We need the IPv8 peer key at this point. However, the configured session is not started yet. So we
         # generate the keys here and place them in the correct place. When the session starts it will load these keys.
-        print('Id received: creating trustchain keys')
         keypair = generate_keypair_trustchain()
         pairfilename = self.tribler_config.get_trustchain_keypair_filename()
         save_keypair_trustchain(keypair, pairfilename)
