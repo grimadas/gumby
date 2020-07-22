@@ -4,6 +4,8 @@ from asyncio import Future
 from binascii import hexlify
 from os import environ, getpid, makedirs, symlink, path
 
+from bami.backbone.sub_community import IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy
+from bami.payment.community import PaymentCommunity
 from ipv8.peer import Peer
 
 from gumby.anydex_config import AnyDexConfig
@@ -35,14 +37,21 @@ class GumbyMinimalSession(object):
         self.trustchain_keypair = None
 
 
+class BamiPaymentCommunity(
+    IPv8SubCommunityFactory,
+    RandomWalkDiscoveryStrategy,
+    PaymentCommunity
+):
+    pass
+
+
 class BamiPaymentCommunityLauncher(IPv8CommunityLauncher):
 
     def should_launch(self, session):
         return True
 
     def get_overlay_class(self):
-        from bami.payment.community import PaymentCommunity
-        return PaymentCommunity
+        return BamiPaymentCommunity
 
     def get_my_peer(self, ipv8, session):
         return Peer(session.trustchain_keypair)

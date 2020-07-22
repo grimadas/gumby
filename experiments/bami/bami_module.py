@@ -6,10 +6,10 @@ from typing import Optional
 
 from bami.backbone.datastore.database import ChainTopic
 from bami.backbone.utils import decode_raw
-from bami.payment.community import PaymentCommunity
 from bami.payment.exceptions import InsufficientBalanceException
 
 from gumby.experiment import experiment_callback
+from gumby.modules.anydex_module import BamiPaymentCommunity
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
 from gumby.modules.experiment_module import static_module
 
@@ -17,7 +17,7 @@ from gumby.modules.experiment_module import static_module
 @static_module
 class BamiExperiments(IPv8OverlayExperimentModule):
     def __init__(self, experiment):
-        super().__init__(experiment, PaymentCommunity)
+        super().__init__(experiment, BamiPaymentCommunity)
         self._logger.info('Creating experiment session: bami')
         self.request_signatures_lc = None
         self.num_blocks_in_db_task = None
@@ -25,7 +25,7 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         self.request_signatures_task = None
 
     @property
-    def overlay(self) -> Optional[PaymentCommunity]:
+    def overlay(self) -> Optional[BamiPaymentCommunity]:
         return super().overlay()
 
     def on_ipv8_available(self, _):
