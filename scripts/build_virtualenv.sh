@@ -75,18 +75,6 @@ if [ -e $VENV/.completed.$SCRIPT_VERSION ]; then
     exit
 fi
 
-while getopts ":a:" opt; do
-  case $opt in
-    a)
-      ADDED_REQ=$OPTARG
-      ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      exit 1
-      ;;
-  esac
-done
-
 # If we compile for Python 3, we want to install a newer version since the version on the DAS5 is outdated.
 if [ ! -e ~/python3/bin/python3 ]; then
     pushd $HOME
