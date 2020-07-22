@@ -331,6 +331,7 @@ service_identity
 aiohttp
 aiohttp_apispec
 yappi
+git+git://github.com/grimadas/noodle@master#egg=bami
 " > ~/requirements.txt
 
 # Add modular requirements
