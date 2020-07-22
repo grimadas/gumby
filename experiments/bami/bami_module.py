@@ -23,9 +23,6 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         self.block_stat_file = None
         self.request_signatures_task = None
 
-    def on_id_received(self):
-        pass
-
     @property
     def overlay(self) -> Optional[PaymentCommunity]:
         return super().overlay()
