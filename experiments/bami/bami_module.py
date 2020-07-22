@@ -10,8 +10,11 @@ from bami.payment.community import PaymentCommunity
 from bami.payment.exceptions import InsufficientBalanceException
 
 from gumby.experiment import experiment_callback
+from gumby.modules.anydex_module import AnyDexModule
+from gumby.modules.bami_module import BamiPaymentCommunityLauncher
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
 from gumby.modules.experiment_module import static_module
+from gumby.modules.isolated_community_loader import IsolatedIPv8CommunityLoader
 
 
 @static_module
@@ -22,6 +25,9 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         self.num_blocks_in_db_task = None
         self.block_stat_file = None
         self.request_signatures_task = None
+
+    def on_id_received(self):
+        pass
 
     @property
     def overlay(self) -> Optional[PaymentCommunity]:
