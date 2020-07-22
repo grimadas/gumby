@@ -151,6 +151,8 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         # generate the keys here and place them in the correct place. When the session starts it will load these keys.
         keypair = generate_keypair_trustchain()
         pairfilename = self.tribler_config.get_trustchain_keypair_filename()
+        enabled = self.tribler_config.get_trustchain_enabled()
+        self._logger.info('Config get trustchain keypair filename: ' + pairfilename, enabled)
         save_keypair_trustchain(keypair, pairfilename)
         save_pub_key_trustchain(keypair, "%s.pub" % pairfilename)
 

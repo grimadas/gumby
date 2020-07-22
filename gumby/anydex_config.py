@@ -13,16 +13,12 @@ class AnyDexConfig(object):
                 'statistics': False
             },
             'market_community': {
-                'enabled': True
+                'enabled': False
             },
             'trustchain': {
-                'enabled': True,
-                'memory_db': True,
+                'enabled': False,
                 'ec_keypair_filename': ''
             },
-            'dht': {
-                'enabled': True
-            }
         }
 
     def get_trustchain_enabled(self):
