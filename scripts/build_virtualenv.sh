@@ -334,7 +334,9 @@ yappi
 " > ~/requirements.txt
 
 # Add modular requirements
+echo 'Analyzing additional requirements'
 if [ -n "$ADDED_REQ" ]; then
+  echo "Adding more dependencies to requirements $ADDED_REQ"
   cat "$ADDED_REQ" >> ~/requirements.txt
 fi
 
