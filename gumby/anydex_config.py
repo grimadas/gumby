@@ -17,8 +17,12 @@ class AnyDexConfig(object):
             },
             'trustchain': {
                 'enabled': False,
+                'memory_db': True,
                 'ec_keypair_filename': ''
             },
+            'dht': {
+                'enabled': False
+            }
         }
 
     def get_trustchain_enabled(self):
