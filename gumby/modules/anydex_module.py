@@ -81,8 +81,8 @@ class AnyDexModule(ExperimentModule):
             statistics_file.write(json.dumps(new_dict) + '\n')
 
     def on_id_received(self):
-        super(AnyDexModule, self).on_id_received()
         self.tribler_config = self.setup_config()
+        super(AnyDexModule, self).on_id_received()
 
     def create_ipv8_community_loader(self):
         loader = IsolatedIPv8CommunityLoader(self.session_id)
