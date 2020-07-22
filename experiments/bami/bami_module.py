@@ -10,11 +10,8 @@ from bami.payment.community import PaymentCommunity
 from bami.payment.exceptions import InsufficientBalanceException
 
 from gumby.experiment import experiment_callback
-from gumby.modules.anydex_module import AnyDexModule
-from gumby.modules.bami_module import BamiPaymentCommunityLauncher
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
 from gumby.modules.experiment_module import static_module
-from gumby.modules.isolated_community_loader import IsolatedIPv8CommunityLoader
 
 
 @static_module

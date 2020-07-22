@@ -28,4 +28,5 @@ class BamiModule(AnyDexModule):
     def create_ipv8_community_loader(self):
         loader = IsolatedIPv8CommunityLoader(self.session_id)
         loader.set_launcher(BamiPaymentCommunityLauncher())
+        print('Creating bami launcher', loader)
         return loader
