@@ -4,9 +4,12 @@ from asyncio import Future
 from binascii import hexlify
 from os import environ, getpid, makedirs, symlink, path
 
+from ipv8.peer import Peer
+
 from gumby.anydex_config import AnyDexConfig
 from gumby.experiment import experiment_callback
-from gumby.modules.community_launcher import TrustChainCommunityLauncher, MarketCommunityLauncher, DHTCommunityLauncher
+from gumby.modules.community_launcher import IPv8CommunityLauncher, TrustChainCommunityLauncher, \
+    MarketCommunityLauncher, DHTCommunityLauncher
 from gumby.modules.experiment_module import ExperimentModule, static_module
 from gumby.modules.isolated_community_loader import IsolatedIPv8CommunityLoader
 from gumby.util import read_keypair_trustchain, run_task
@@ -30,6 +33,19 @@ class GumbyMinimalSession(object):
         self.config = config
         self.lm = GumbyMinimalLm()
         self.trustchain_keypair = None
+
+
+class BamiPaymentCommunityLauncher(IPv8CommunityLauncher):
+
+    def should_launch(self, session):
+        return True
+
+    def get_overlay_class(self):
+        from bami.payment.community import PaymentCommunity
+        return PaymentCommunity
+
+    def get_my_peer(self, ipv8, session):
+        return Peer(session.trustchain_keypair)
 
 
 @static_module
@@ -73,6 +89,7 @@ class AnyDexModule(ExperimentModule):
         loader.set_launcher(TrustChainCommunityLauncher())
         loader.set_launcher(MarketCommunityLauncher())
         loader.set_launcher(DHTCommunityLauncher())
+        loader.set_launcher(BamiPaymentCommunityLauncher())
         return loader
 
     @experiment_callback

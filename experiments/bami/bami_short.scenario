@@ -1,4 +1,4 @@
-&module gumby.modules.bami_module.BamiModule
+&module gumby.modules.anydex_module.AnyDexModule
 &module experiments.bami.bami_module.BamiExperiments
 
 @0:1 isolate_ipv8_overlay PaymentCommunity
