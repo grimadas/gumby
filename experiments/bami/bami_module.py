@@ -24,10 +24,6 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         self.block_stat_file = None
         self.request_signatures_task = None
 
-    @property
-    def overlay(self) -> Optional[BamiPaymentCommunity]:
-        return super().overlay()
-
     def on_ipv8_available(self, _):
         # Disable threadpool messages
         self.overlay._use_main_thread = True
