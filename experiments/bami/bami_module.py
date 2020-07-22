@@ -17,8 +17,8 @@ from gumby.modules.experiment_module import static_module
 @static_module
 class BamiExperiments(IPv8OverlayExperimentModule):
     def __init__(self, experiment):
-        self._logger.info('Creating experiment session: bami')
         super().__init__(experiment, PaymentCommunity)
+        self._logger.info('Creating experiment session: bami')
         self.request_signatures_lc = None
         self.num_blocks_in_db_task = None
         self.block_stat_file = None
