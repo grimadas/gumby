@@ -53,7 +53,7 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         context = self.overlay.context
         # Change to default
         if not value:
-            value = Decimal(1000, context)
+            value = Decimal(99, context)
         else:
             value = Decimal(value, context)
         self.overlay.mint(value=value)
