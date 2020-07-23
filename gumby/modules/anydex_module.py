@@ -114,6 +114,7 @@ class AnyDexModule(ExperimentModule):
         ipv8_config['overlays'] = []
         ipv8_config['keys'] = []  # We load the keys ourselves
         self.ipv8 = IPv8(ipv8_config, enable_statistics=self.tribler_config.get_ipv8_statistics())
+        self.ipv8.start()
 
         self.session = GumbyMinimalSession(self.tribler_config)
         self.session.trustchain_keypair = read_keypair_trustchain(self.tribler_config.get_trustchain_keypair_filename())

@@ -16,12 +16,12 @@ class AnyDexConfig(object):
                 'enabled': False
             },
             'trustchain': {
-                'enabled': True,
+                'enabled': False,
                 'memory_db': True,
                 'ec_keypair_filename': ''
             },
             'dht': {
-                'enabled': True
+                'enabled': False
             }
         }
 
