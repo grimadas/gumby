@@ -10,7 +10,7 @@ class AnyDexConfig(object):
             },
             'ipv8': {
                 'port': 8000,
-                'statistics': False
+                'statistics': True
             },
             'market_community': {
                 'enabled': False
