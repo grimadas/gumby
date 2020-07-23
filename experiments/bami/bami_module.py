@@ -51,13 +51,13 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         self.overlay.subscribe_to_subcom(group_id)
 
     @experiment_callback
-    def mint(self, value: str = None) -> None:
+    def mint(self, val: str = None) -> None:
         context = self.overlay.context
         # Change to default
-        if not value:
+        if not val:
             value = Decimal(99, context)
         else:
-            value = Decimal(value, context)
+            value = Decimal(val, context)
         self.overlay.mint(value=value)
         print("Mint request performed!")
 
@@ -118,7 +118,7 @@ class BamiExperiments(IPv8OverlayExperimentModule):
                                      'dot': block.com_dot,
                                      'transaction': str(decode_raw(block.transaction))})
 
-        self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output', 'blocks_time.csv')
+        self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output', 'blocks_time_' + str(self.my_id)+'.csv')
         with open(self.block_stat_file, "w") as t_file:
             writer = csv.DictWriter(t_file, block_dict)
             writer.writeheader()

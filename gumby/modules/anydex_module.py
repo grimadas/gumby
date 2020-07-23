@@ -138,8 +138,8 @@ class AnyDexModule(ExperimentModule):
         self.custom_ipv8_community_loader.isolate(name)
 
     @experiment_callback
-    def stop_session(self):
-        self.ipv8.stop()
+    async def stop_session(self):
+        await self.ipv8.stop()
 
     def setup_config(self):
         if self.ipv8_port is None:
