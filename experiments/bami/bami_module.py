@@ -1,3 +1,4 @@
+from base64 import b64decode, b64encode
 import csv
 from decimal import Decimal
 import os
@@ -31,13 +32,10 @@ class BamiExperiments(IPv8OverlayExperimentModule):
 
         self.change_settings_from_environ()
 
-    #def get_peer_public_key(self, peer_id):
-        # override the default implementation since we use the trustchain key here.
-    #    return self.all_vars[peer_id]['trustchain_public_key']
-
     def get_peer_id_by_pubkey(self, pub_key: bytes) -> Optional[str]:
+        pub_key_convert = b64encode(pub_key).decode('utf-8')
         for p_id in self.all_vars:
-            if pub_key == self.all_vars[p_id]['public_key']:
+            if pub_key_convert == self.all_vars[p_id]['public_key']:
                 return p_id
         else:
             return None
@@ -45,7 +43,8 @@ class BamiExperiments(IPv8OverlayExperimentModule):
     @experiment_callback
     def join_group(self, group_experiment_id: str) -> None:
         """Peer creates a sub-community with own id as the manager peer"""
-        group_id = self.get_peer_public_key(group_experiment_id)
+        group_id = b64decode(self.get_peer_public_key(group_experiment_id))
+        self._logger.info('Joining sub-community with id %s', group_id)
         print('Joining sub-community with id ', group_id)
         self.overlay.subscribe_to_subcom(group_id)
 
@@ -63,8 +62,8 @@ class BamiExperiments(IPv8OverlayExperimentModule):
     @experiment_callback
     def transfer(self, group_experiment_id: str, counter_party_id: str, value: str):
         context = self.overlay.context
-        group_id = self.get_peer_public_key(group_experiment_id)
-        counter_party_key_id = self.get_peer_public_key(counter_party_id)
+        group_id = b64decode(self.get_peer_public_key(group_experiment_id))
+        counter_party_key_id = b64decode(self.get_peer_public_key(counter_party_id))
         value = Decimal(value, context)
         try:
             self.overlay.spend(group_id, counter_party_key_id, value=value)
