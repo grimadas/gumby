@@ -105,7 +105,7 @@ class AnyDexModule(ExperimentModule):
         return loader
 
     @experiment_callback
-    def start_session(self):
+    async def start_session(self):
         from ipv8.configuration import get_default_configuration
         self._logger.info('Starting session')
 
@@ -118,7 +118,7 @@ class AnyDexModule(ExperimentModule):
         self.session.trustchain_keypair = read_keypair_trustchain(self.tribler_config.get_trustchain_keypair_filename())
         # Load overlays
         self.custom_ipv8_community_loader.load(self.ipv8, self.session)
-        self.ipv8.start()
+        await self.ipv8.start()
         self.ipv8_available.set_result(self.ipv8)
 
     @experiment_callback
