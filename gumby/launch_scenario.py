@@ -67,6 +67,11 @@ def main(self_service=False):
         subdir_path = path.join(environ["TRIBLER_DIR"], 'src', subdir_name)
         if subdir_path not in python_path:
             python_path.append(subdir_path)
+    # Add bami directory if it exists:
+    if path.exists(path.join(environ["PROJECT_DIR"], 'bami')):
+        subdir_path = path.join(environ["PROJECT_DIR"], 'bami', 'src')
+        if subdir_path not in python_path:
+            python_path.append(subdir_path)
     if environ["EXPERIMENT_DIR"] not in python_path:
         python_path.append(environ["EXPERIMENT_DIR"])
     if environ["IPV8_DIR"] not in python_path:
