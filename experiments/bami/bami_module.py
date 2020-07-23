@@ -31,13 +31,13 @@ class BamiExperiments(IPv8OverlayExperimentModule):
 
         self.change_settings_from_environ()
 
-    def get_peer_public_key(self, peer_id):
+    #def get_peer_public_key(self, peer_id):
         # override the default implementation since we use the trustchain key here.
-        return self.all_vars[peer_id]['trustchain_public_key']
+    #    return self.all_vars[peer_id]['trustchain_public_key']
 
     def get_peer_id_by_pubkey(self, pub_key: bytes) -> Optional[str]:
         for p_id in self.all_vars:
-            if pub_key == self.all_vars[p_id]['trustchain_public_key']:
+            if pub_key == self.all_vars[p_id]['public_key']:
                 return p_id
         else:
             return None

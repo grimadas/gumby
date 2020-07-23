@@ -121,8 +121,11 @@ class IPv8OverlayExperimentModule(ExperimentModule):
                               if int(peer_id) not in excluded_peers_list and int(peer_id) != self.my_id]
             max_peers = min(len(eligible_peers), int(max_peers))
             rand_peer_ids = sample(eligible_peers, int(max_peers))
+
             for rand_peer_id in rand_peer_ids:
-                self.overlay.walk_to(self.experiment.get_peer_ip_port_by_id(rand_peer_id))
+                peer_address = self.experiment.get_peer_ip_port_by_id(rand_peer_id)
+                self._logger.info('Walking to %s', peer_address)
+                self.overlay.walk_to(peer_address)
 
     @experiment_callback
     def add_walking_strategy(self, name, max_peers, **kwargs):
@@ -140,7 +143,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         return Peer(b64decode(self.get_peer_public_key(peer_id)), address=address)
 
     def get_peer_public_key(self, peer_id):
-        return self.all_vars[peer_id][b'public_key']
+        return self.all_vars[peer_id]['public_key']
 
     def on_id_received(self):
         # Since the IPv8 source module is loaded before any community module, the IPv8 on_id_received has

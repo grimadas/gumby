@@ -139,6 +139,8 @@ class ExperimentClient(LineReceiver):
     def get_peer_ip_port_by_id(self, peer_id):
         if str(peer_id) in self.all_vars:
             return str(self.all_vars[str(peer_id)]['host']), self.all_vars[str(peer_id)]['port']
+        else:
+            raise Exception('No peer_id found in experiment', str(peer_id))
 
     def get_peers(self):
         return self.all_vars.keys()
