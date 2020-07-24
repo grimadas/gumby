@@ -96,14 +96,14 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         if os.environ.get('PULL_GOSSIP_FANOUT'):
             self.overlay.settings.gossip_fanout = os.environ.get('PULL_GOSSIP_FANOUT')
 
-    def add_block(self, start_time, overlay, chain_id=None, dots=None):
+    def add_block(self, chain_id=None, dots=None):
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
-        self._logger.info('Adding block dots overlay: %s, communtiy_class: %s', overlay, self.community_class)
+        self._logger.info('Adding block dots overlay: %s, communtiy_class: %s', self.overlay, self.community_class)
         with open(self.block_stat_file, "a") as t_file:
             for dot in dots:
-                block = overlay.get_block_by_dot(chain_id, dot)
+                block = self.overlay.get_block_by_dot(chain_id, dot)
                 writer = csv.DictWriter(t_file, block_dict)
-                writer.writerow({"time": time() - start_time,
+                writer.writerow({"time": time() - self.start_time,
                                  'group_id': self.get_peer_id_by_pubkey(block.com_id),
                                  'creator': self.get_peer_id_by_pubkey(block.public_key),
                                  'type': str(block.type),
@@ -120,4 +120,5 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         with open(self.block_stat_file, "w") as t_file:
             writer = csv.DictWriter(t_file, block_dict)
             writer.writeheader()
-        self.overlay.persistence.add_observer(ChainTopic.ALL, self.add_block, time(), self.overlay)
+        self.start_time = time()
+        self.overlay.persistence.add_observer(ChainTopic.ALL, self.add_block)
