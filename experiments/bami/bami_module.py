@@ -74,27 +74,27 @@ class BamiExperiments(IPv8OverlayExperimentModule):
     @experiment_callback
     def change_settings_from_environ(self):
         if os.environ.get('WITNESS_BLOCK_DELTA'):
-            self.overlay.settings.witness_block_delta = float(os.environ.get('WITNESS_BLOCK_DELTA'))
+            self.overlay.settings.witness_block_delta = int(float(os.environ.get('WITNESS_BLOCK_DELTA')))
         if os.environ.get('WITNESS_DELTA_TIME'):
-            self.overlay.settings.witness_delta_time = float(os.environ.get('WITNESS_DELTA_TIME'))
+            self.overlay.settings.witness_delta_time = float(float(os.environ.get('WITNESS_DELTA_TIME')))
         if os.environ.get('PUSH_GOSSIP_FANOUT'):
-            self.overlay.settings.push_gossip_fanout = os.environ.get('PUSH_GOSSIP_FANOUT')
+            self.overlay.settings.push_gossip_fanout = int(os.environ.get('PUSH_GOSSIP_FANOUT'))
         if os.environ.get('PUSH_GOSSIP_TTL'):
-            self.overlay.settings.push_gossip_ttl = os.environ.get('PUSH_GOSSIP_TTL')
+            self.overlay.settings.push_gossip_ttl = int(os.environ.get('PUSH_GOSSIP_TTL'))
         if os.environ.get('GOSSIP_MAX_DELAY'):
-            self.overlay.settings.gossip_sync_max_delay = os.environ.get('GOSSIP_MAX_DELAY')
+            self.overlay.settings.gossip_sync_max_delay = float(os.environ.get('GOSSIP_MAX_DELAY'))
         if os.environ.get('GOSSIP_DELTA_TIME'):
-            self.overlay.settings.gossip_sync_time = os.environ.get('GOSSIP_DELTA_TIME')
+            self.overlay.settings.gossip_sync_time = float(os.environ.get('GOSSIP_DELTA_TIME'))
         if os.environ.get('GOSSIP_COLLECT_TIME'):
-            self.overlay.settings.gossip_collect_time = os.environ.get('GOSSIP_COLLECT_TIME')
+            self.overlay.settings.gossip_collect_time = float(os.environ.get('GOSSIP_COLLECT_TIME'))
         if os.environ.get('BLOCK_SIGN_DELTA_TIME'):
-            self.overlay.settings.block_sign_delta = os.environ.get('BLOCK_SIGN_DELTA_TIME')
+            self.overlay.settings.block_sign_delta = float(os.environ.get('BLOCK_SIGN_DELTA_TIME'))
         if os.environ.get('BLOCK_SIGN_DELTA_TIME'):
-            self.overlay.settings.block_sign_delta = os.environ.get('BLOCK_SIGN_DELTA_TIME')
+            self.overlay.settings.block_sign_delta = float(os.environ.get('BLOCK_SIGN_DELTA_TIME'))
         if os.environ.get('BLOCK_MAX_WAIT_TIME'):
-            self.overlay.settings.max_wait_time = os.environ.get('BLOCK_MAX_WAIT_TIME')
+            self.overlay.settings.max_wait_time = float(os.environ.get('BLOCK_MAX_WAIT_TIME'))
         if os.environ.get('PULL_GOSSIP_FANOUT'):
-            self.overlay.settings.gossip_fanout = os.environ.get('PULL_GOSSIP_FANOUT')
+            self.overlay.settings.gossip_fanout = int(os.environ.get('PULL_GOSSIP_FANOUT'))
 
     def add_block(self, chain_id=None, dots=None):
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
