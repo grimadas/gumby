@@ -26,6 +26,7 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         self.request_signatures_task = None
 
         self.start_time = None
+        self.overlay_copy = None
 
     def on_ipv8_available(self, _):
         # Disable threadpool messages
@@ -45,6 +46,7 @@ class BamiExperiments(IPv8OverlayExperimentModule):
     @experiment_callback
     def join_group(self, group_experiment_id: str) -> None:
         """Peer creates a sub-community with own id as the manager peer"""
+        self.overlay_copy = self.overlay
         group_id = b64decode(self.get_peer_public_key(group_experiment_id))
         self._logger.info('Joining sub-community with id %s', group_id)
         self.overlay.subscribe_to_subcom(group_id)
@@ -98,10 +100,10 @@ class BamiExperiments(IPv8OverlayExperimentModule):
 
     def add_block(self, chain_id=None, dots=None):
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
-        self._logger.info('Adding block dots overlay: %s, communtiy_class: %s', self.overlay, self.community_class)
+        self._logger.info('Adding block dots overlay: %s, communtiy_class: %s', self.overlay_copy, self.community_class)
         with open(self.block_stat_file, "a") as t_file:
             for dot in dots:
-                block = self.overlay.get_block_by_dot(chain_id, dot)
+                block = self.overlay_copy.get_block_by_dot(chain_id, dot)
                 writer = csv.DictWriter(t_file, block_dict)
                 writer.writerow({"time": time() - self.start_time,
                                  'group_id': self.get_peer_id_by_pubkey(block.com_id),
