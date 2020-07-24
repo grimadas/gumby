@@ -47,7 +47,6 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         """Peer creates a sub-community with own id as the manager peer"""
         group_id = b64decode(self.get_peer_public_key(group_experiment_id))
         self._logger.info('Joining sub-community with id %s', group_id)
-        print('Joining sub-community with id ', group_id)
         self.overlay.subscribe_to_subcom(group_id)
 
     @experiment_callback
@@ -97,16 +96,14 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         if os.environ.get('PULL_GOSSIP_FANOUT'):
             self.overlay.settings.gossip_fanout = os.environ.get('PULL_GOSSIP_FANOUT')
 
-    def add_block(self, chain_id, dots):
+    def add_block(self, start_time, overlay, chain_id=None, dots=None):
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
-        if not self.start_time:
-            # First block received
-            self.start_time = time()
+        self._logger.info('Adding block dots overlay: %s, communtiy_class: %s', overlay, self.community_class)
         with open(self.block_stat_file, "a") as t_file:
             for dot in dots:
-                block = self.overlay.get_block_by_dot(chain_id, dot)
+                block = overlay.get_block_by_dot(chain_id, dot)
                 writer = csv.DictWriter(t_file, block_dict)
-                writer.writerow({"time": time() - self.start_time,
+                writer.writerow({"time": time() - start_time,
                                  'group_id': self.get_peer_id_by_pubkey(block.com_id),
                                  'creator': self.get_peer_id_by_pubkey(block.public_key),
                                  'type': str(block.type),
@@ -118,8 +115,9 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         print('Tracking all blocks')
         # Open projects output directory and save blocks arrival time
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
-        self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output', 'blocks_time_' + str(self.my_id)+'.csv')
+        self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output',
+                                            'blocks_time_' + str(self.my_id) + '.csv')
         with open(self.block_stat_file, "w") as t_file:
             writer = csv.DictWriter(t_file, block_dict)
             writer.writeheader()
-        self.overlay.persistence.add_observer(ChainTopic.ALL, self.add_block)
+        self.overlay.persistence.add_observer(ChainTopic.ALL, self.add_block, time(), self.overlay)
