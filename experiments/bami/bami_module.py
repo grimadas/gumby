@@ -114,7 +114,7 @@ class BamiExperiments(IPv8OverlayExperimentModule):
     @experiment_callback
     def track_all_blocks(self, peer_id: str = None):
         if peer_id:
-            peer_id = self.get_peer_public_key(peer_id)
+            peer_id = b64decode(self.get_peer_public_key(peer_id))
         # Open projects output directory and save blocks arrival time
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
         self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output',
