@@ -125,5 +125,6 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         self.start_time = time()
         if peer_id:
             self.overlay.persistence.add_observer(peer_id, self.add_block)
+            self.overlay.persistence.add_observer(b'w'+peer_id, self.add_block)
         else:
             self.overlay.persistence.add_observer(ChainTopic.ALL, self.add_block)
