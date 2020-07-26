@@ -95,6 +95,8 @@ class BamiExperiments(IPv8OverlayExperimentModule):
             self.overlay.settings.max_wait_time = float(os.environ.get('BLOCK_MAX_WAIT_TIME'))
         if os.environ.get('PULL_GOSSIP_FANOUT'):
             self.overlay.settings.gossip_fanout = int(os.environ.get('PULL_GOSSIP_FANOUT'))
+        if os.environ.get('DIVERSITY_CONFIRM'):
+            self.overlay.settings.diversity_confirm = int(os.environ.get('DIVERSITY_CONFIRM'))
 
     def add_block(self, chain_id=None, dots=None):
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
