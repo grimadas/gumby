@@ -27,6 +27,19 @@ class BamiExperiments(IPv8OverlayExperimentModule):
 
         self.start_time = None
 
+
+@static_module
+class BamiPaymentExperiments(IPv8OverlayExperimentModule):
+    def __init__(self, experiment):
+        super().__init__(experiment, BamiPaymentCommunity)
+        self._logger.info('Creating experiment session: bami')
+        self.request_signatures_lc = None
+        self.num_blocks_in_db_task = None
+        self.block_stat_file = None
+        self.request_signatures_task = None
+
+        self.start_time = None
+
     def on_ipv8_available(self, _):
         # Disable threadpool messages
         self.overlay._use_main_thread = True
@@ -127,6 +140,6 @@ class BamiExperiments(IPv8OverlayExperimentModule):
         self.start_time = time()
         if peer_id:
             self.overlay.persistence.add_observer(peer_id, self.add_block)
-            self.overlay.persistence.add_observer(b'w'+peer_id, self.add_block)
+            self.overlay.persistence.add_observer(b'w' + peer_id, self.add_block)
         else:
             self.overlay.persistence.add_observer(ChainTopic.ALL, self.add_block)

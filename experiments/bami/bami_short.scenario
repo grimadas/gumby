@@ -1,5 +1,5 @@
 &module gumby.modules.anydex_module.AnyDexModule
-&module experiments.bami.bami_module.BamiExperiments
+&module experiments.bami.bami_module.BamiPaymentExperiments
 
 @0:1 isolate_ipv8_overlay BamiPaymentCommunity
 @0:2 start_session

@@ -1,22 +1,18 @@
-import json
-import time
 from asyncio import Future
 from binascii import hexlify
-from os import environ, getpid, makedirs, symlink, path
+import json
+from os import environ, getpid, makedirs, path, symlink
+import time
 
-from bami.backbone.sub_community import IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy
-from bami.payment.community import PaymentCommunity
-from ipv8.peer import Peer
+from ipv8_service import IPv8
 
 from gumby.anydex_config import AnyDexConfig
 from gumby.experiment import experiment_callback
-from gumby.modules.community_launcher import IPv8CommunityLauncher, TrustChainCommunityLauncher, \
-    MarketCommunityLauncher, DHTCommunityLauncher
+from gumby.modules.bami_module import BamiPaymentCommunityLauncher
+from gumby.modules.community_launcher import DHTCommunityLauncher, MarketCommunityLauncher, TrustChainCommunityLauncher
 from gumby.modules.experiment_module import ExperimentModule, static_module
 from gumby.modules.isolated_community_loader import IsolatedIPv8CommunityLoader
 from gumby.util import read_keypair_trustchain, run_task
-
-from ipv8_service import IPv8
 
 
 class GumbyMinimalLm(object):
@@ -35,26 +31,6 @@ class GumbyMinimalSession(object):
         self.config = config
         self.lm = GumbyMinimalLm()
         self.trustchain_keypair = None
-
-
-class BamiPaymentCommunity(
-    IPv8SubCommunityFactory,
-    RandomWalkDiscoveryStrategy,
-    PaymentCommunity
-):
-    pass
-
-
-class BamiPaymentCommunityLauncher(IPv8CommunityLauncher):
-
-    def should_launch(self, session):
-        return True
-
-    def get_overlay_class(self):
-        return BamiPaymentCommunity
-
-    def get_my_peer(self, ipv8, session):
-        return Peer(session.trustchain_keypair)
 
 
 @static_module
