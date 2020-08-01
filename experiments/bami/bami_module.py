@@ -104,6 +104,9 @@ class BamiDataExperiments(BaseBamiExperiments):
 
         self.blob_creation_tasks = {}
         self.meta_creation_tasks = {}
+
+    def on_id_received(self):
+        super().on_id_received()
         self.init_block_stat_file()
 
     @experiment_callback
@@ -158,6 +161,9 @@ class BamiDataExperiments(BaseBamiExperiments):
 class BamiPaymentExperiments(BaseBamiExperiments):
     def __init__(self, experiment):
         super().__init__(experiment, BamiPaymentCommunity)
+
+    def on_id_received(self):
+        super().on_id_received()
         self.init_block_stat_file()
 
     @experiment_callback
