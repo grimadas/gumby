@@ -89,6 +89,7 @@ class BaseBamiExperiments(IPv8OverlayExperimentModule):
         block_dict = ['time', 'group_id', 'creator', 'type', 'dot', 'transaction']
         self.block_stat_file = os.path.join(os.environ['PROJECT_DIR'], 'output',
                                             'blocks_time_' + str(self.my_id) + '.csv')
+        self._logger.info('Creating block state file %s', self.block_stat_file)
         with open(self.block_stat_file, "w") as t_file:
             writer = csv.DictWriter(t_file, block_dict)
             writer.writeheader()
