@@ -103,6 +103,7 @@ class BamiDataExperiments(BaseBamiExperiments):
 
         self.blob_creation_tasks = {}
         self.meta_creation_tasks = {}
+        self.init_block_stat_file()
 
     @experiment_callback
     def start_creating_blobs(self) -> None:
@@ -156,6 +157,7 @@ class BamiDataExperiments(BaseBamiExperiments):
 class BamiPaymentExperiments(BaseBamiExperiments):
     def __init__(self, experiment):
         super().__init__(experiment, BamiPaymentCommunity)
+        self.init_block_stat_file()
 
     @experiment_callback
     def join_group(self, peer_id: str) -> None:
