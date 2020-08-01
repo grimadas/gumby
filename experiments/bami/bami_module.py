@@ -114,10 +114,10 @@ class BamiDataExperiments(BaseBamiExperiments):
         self.overlay.push_data_blob()
 
     @experiment_callback
-    def track_blocks_on_group(self, peer_id: str = '1') -> None:
+    def join_group(self, peer_id: str = '1') -> None:
         self.join_subcommunity_by_peer_id(peer_id)
 
-        com_id = self.get_peer_public_key(peer_id)
+        com_id = b64decode(self.get_peer_public_key(peer_id))
         self.overlay.subscribe_out_order_block(com_id, self.add_block)
 
         # 2. Meta-data on the data blocks, process them in-order
@@ -170,7 +170,7 @@ class BamiPaymentExperiments(BaseBamiExperiments):
     def join_group(self, peer_id: str) -> None:
         self.join_subcommunity_by_peer_id(peer_id)
 
-        com_id = self.get_peer_public_key(peer_id)
+        com_id = b64decode(self.get_peer_public_key(peer_id))
         self.overlay.subscribe_in_order_block(com_id, self.add_block)
 
     @experiment_callback

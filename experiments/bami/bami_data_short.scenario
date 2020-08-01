@@ -5,7 +5,7 @@
 @0:2 start_session
 @0:10 introduce_peers
 @0:20 annotate group-forming
-@0:21 track_blocks_on_group 1
+@0:21 join_group 1
 @0:30 start_creating_blobs
 @0:33 start_creating_meta_blocks
 @0:100 stop_creating_blobs
