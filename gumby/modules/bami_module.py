@@ -30,7 +30,7 @@ class BamiPaymentCommunityLauncher(IPv8CommunityLauncher):
         return Peer(session.trustchain_keypair)
 
 
-class BaseDataCommunity(IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy, BamiCommunity, metaclass=ABCMeta):
+class BaseDataCommunity(IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy, BamiCommunity):
 
     def witness_tx_well_formatted(self, witness_tx: Any) -> bool:
         pass
@@ -72,10 +72,10 @@ class DataCommunity(BaseDataCommunity):
         self.subscribe_in_order_block(meta_prefix + sub_com_id, self.process_meta_block)
         # Process incoming blocks in order
 
-    def inform(self, data_blob: bytes, chain_id: bytes) -> None:
+    def push_data_blob(self, data_blob: bytes, chain_id: bytes) -> None:
         blk = self.create_signed_block(block_type=b'data', transaction=data_blob, com_id=chain_id)
         self.share_in_community(blk, chain_id)
 
-    def update_meta(self, meta_blob: bytes, chain_id: bytes):
+    def push_meta_data(self, meta_blob: bytes, chain_id: bytes):
         blk = self.create_signed_block(block_type=b'meta', transaction=meta_blob, com_id=chain_id, prefix=self.META_PREFIX)
         self.share_in_community(blk, chain_id)
