@@ -98,7 +98,9 @@ def plot_throughput_reaction(out_dir: str, df: pd.DataFrame, reactions: Dict) ->
 
 def process_block_times(out_dir: str) -> None:
     # Get files to process in the experiment
+    print('Processing block times on dir', out_dir)
     files = get_experiment_files(out_dir)
+    print('Total number of block files', len(files))
     # Transactions for the experiments
     txs, reacts = experiment_transactions(out_dir, files)
     df = create_data_frame(txs)
