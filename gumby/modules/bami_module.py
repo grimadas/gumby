@@ -72,7 +72,7 @@ class DataCommunity(BaseDataCommunity):
         # Process incoming blocks in order
 
     def push_data_blob(self, data_blob: bytes, chain_id: bytes) -> None:
-        blk = self.create_signed_block(block_type=b'data', transaction=data_blob, com_id=chain_id)
+        blk = self.create_signed_block(block_type=b'data', transaction=data_blob, com_id=chain_id, use_consistent_links=False)
         self.share_in_community(blk, chain_id)
 
     def push_meta_data(self, meta_blob: bytes, chain_id: bytes):
