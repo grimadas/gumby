@@ -129,7 +129,7 @@ class BamiDataExperiments(BaseBamiExperiments):
     @experiment_callback
     def create_random_blob(self, peer_id: str, blob_size: int) -> None:
         blob = b'0' * int(blob_size)
-        com_id = self.get_peer_public_key(peer_id)
+        com_id = b64decode(self.get_peer_public_key(peer_id))
         self.overlay.push_data_blob(blob, com_id)
 
     @experiment_callback
@@ -145,7 +145,7 @@ class BamiDataExperiments(BaseBamiExperiments):
     @experiment_callback
     def create_random_meta_block(self, peer_id: str) -> None:
         meta_blob = encode_raw({b'value': b'val2', b'value1': b'val3'})
-        com_id = self.get_peer_public_key(peer_id)
+        com_id = b64decode(self.get_peer_public_key(peer_id))
         self.overlay.push_meta_data(meta_blob, com_id)
 
     @experiment_callback
