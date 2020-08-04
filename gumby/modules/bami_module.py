@@ -30,7 +30,7 @@ class BamiPaymentCommunityLauncher(IPv8CommunityLauncher):
         return Peer(session.trustchain_keypair)
 
 
-class BaseDataCommunity(IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy, BamiCommunity):
+class BaseDataCommunity(IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy, BamiCommunity, metaclass=ABCMeta):
 
     def witness_tx_well_formatted(self, witness_tx: Any) -> bool:
         pass
@@ -79,3 +79,16 @@ class DataCommunity(BaseDataCommunity):
     def push_meta_data(self, meta_blob: bytes, chain_id: bytes):
         blk = self.create_signed_block(block_type=b'meta', transaction=meta_blob, com_id=chain_id, prefix=self.META_PREFIX)
         self.share_in_community(blk, chain_id)
+
+
+class BamiDataCommunityLauncher(IPv8CommunityLauncher):
+
+    def should_launch(self, session):
+        return True
+
+    def get_overlay_class(self):
+        return DataCommunity
+
+    def get_my_peer(self, ipv8, session):
+        return Peer(session.trustchain_keypair)
+

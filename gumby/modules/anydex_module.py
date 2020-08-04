@@ -8,7 +8,7 @@ from ipv8_service import IPv8
 
 from gumby.anydex_config import AnyDexConfig
 from gumby.experiment import experiment_callback
-from gumby.modules.bami_module import BamiPaymentCommunityLauncher
+from gumby.modules.bami_module import BamiPaymentCommunityLauncher, BamiDataCommunityLauncher
 from gumby.modules.community_launcher import DHTCommunityLauncher, MarketCommunityLauncher, TrustChainCommunityLauncher
 from gumby.modules.experiment_module import ExperimentModule, static_module
 from gumby.modules.isolated_community_loader import IsolatedIPv8CommunityLoader
@@ -78,6 +78,7 @@ class AnyDexModule(ExperimentModule):
         loader.set_launcher(MarketCommunityLauncher())
         loader.set_launcher(DHTCommunityLauncher())
         loader.set_launcher(BamiPaymentCommunityLauncher())
+        loader.set_launcher(BamiDataCommunityLauncher())
         return loader
 
     @experiment_callback
