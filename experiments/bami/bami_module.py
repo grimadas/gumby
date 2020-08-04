@@ -150,8 +150,8 @@ class BamiDataExperiments(BaseBamiExperiments):
 
     @experiment_callback
     def start_creating_meta_blocks(self, interval: float = 1, peer_id: str = '1') -> None:
-        self.blob_creation_tasks[b'meta' + peer_id] = run_task(self.create_random_meta_block, peer_id,
-                                                               interval=float(interval))
+        self.blob_creation_tasks['meta' + peer_id] = run_task(self.create_random_meta_block, peer_id,
+                                                              interval=float(interval))
 
     @experiment_callback
     def stop_creating_meta_blocks(self):
