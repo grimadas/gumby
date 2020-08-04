@@ -52,7 +52,6 @@ class BaseDataCommunity(IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy, Ba
 
 
 class DataCommunity(BaseDataCommunity):
-
     META_PREFIX = b'meta'
 
     def process_data_block(self, block: BamiBlock) -> None:
@@ -67,9 +66,9 @@ class DataCommunity(BaseDataCommunity):
         self.subscribe_out_order_block(sub_com_id, self.process_data_block)
 
         # 2. Meta-data on the data blocks, process them in-order
-        meta_prefix = self.META_PREFIX
-        self.start_gossip_sync(sub_com_id, prefix=self.META_PREFIX)
-        self.subscribe_in_order_block(meta_prefix + sub_com_id, self.process_meta_block)
+        # meta_prefix = self.META_PREFIX
+        # self.start_gossip_sync(sub_com_id, prefix=self.META_PREFIX)
+        # self.subscribe_in_order_block(meta_prefix + sub_com_id, self.process_meta_block)
         # Process incoming blocks in order
 
     def push_data_blob(self, data_blob: bytes, chain_id: bytes) -> None:
@@ -77,7 +76,8 @@ class DataCommunity(BaseDataCommunity):
         self.share_in_community(blk, chain_id)
 
     def push_meta_data(self, meta_blob: bytes, chain_id: bytes):
-        blk = self.create_signed_block(block_type=b'meta', transaction=meta_blob, com_id=chain_id, prefix=self.META_PREFIX)
+        blk = self.create_signed_block(block_type=b'meta', transaction=meta_blob, com_id=chain_id,
+                                       prefix=self.META_PREFIX)
         self.share_in_community(blk, chain_id)
 
 
@@ -91,4 +91,3 @@ class BamiDataCommunityLauncher(IPv8CommunityLauncher):
 
     def get_my_peer(self, ipv8, session):
         return Peer(session.trustchain_keypair)
-

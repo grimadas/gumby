@@ -8,7 +8,6 @@
 @0:20 annotate group-forming
 @0:21 join_group 1
 @0:30 start_creating_blobs
-@0:33 start_creating_meta_blocks
 @0:100 stop_creating_blobs
 @0:200 stop_session
 @0:205 stop
