@@ -55,7 +55,7 @@ class DataCommunity(BaseDataCommunity):
     META_PREFIX = b'meta'
 
     def process_data_block(self, block: BamiBlock) -> None:
-        pass
+        self.logger.info('Block data received %s', str(block))
 
     def process_meta_block(self, block: BamiBlock) -> None:
         pass
