@@ -1,10 +1,11 @@
 import os
+from typing import Dict
 
 
 class AnyDexConfig(object):
 
     def __init__(self):
-        self.config = {
+        self.config: Dict = {
             'general': {
                 'state_dir': ''
             },
@@ -22,6 +23,14 @@ class AnyDexConfig(object):
             },
             'dht': {
                 'enabled': False
+            },
+            'bami': {
+                'payment': {
+                    'enabled': False
+                },
+                'data': {
+                    'enabled': False
+                }
             }
         }
 
@@ -58,6 +67,18 @@ class AnyDexConfig(object):
 
     def set_dht_enabled(self, value):
         self.config['dht']['enabled'] = value
+
+    def get_bami_payment_enabled(self) -> bool:
+        return self.config['bami']['payment']['enabled']
+
+    def set_bami_payment_enabled(self, value: bool) -> None:
+        self.config['bami']['payment']["enabled"] = value
+
+    def get_bami_data_enabled(self) -> bool:
+        return self.config['bami']['data']['enabled']
+
+    def set_bami_data_enabled(self, value: bool) -> None:
+        self.config['bami']['data']["enabled"] = value
 
     def set_ipv8_statistics(self, value):
         self.config['ipv8']['statistics'] = value

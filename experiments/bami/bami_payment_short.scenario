@@ -2,6 +2,7 @@
 &module experiments.bami.bami_module.BamiPaymentExperiments
 
 @0:1 isolate_ipv8_overlay BamiPaymentCommunity
+@0:1 enable_bami_payments
 @0:2 start_session
 @0:5 introduce_peers
 @0:20 annotate group-forming

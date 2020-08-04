@@ -82,6 +82,14 @@ class AnyDexModule(ExperimentModule):
         return loader
 
     @experiment_callback
+    def enable_bami_payments(self):
+        self.tribler_config.set_bami_payment_enabled(True)
+
+    @experiment_callback
+    def enable_bami_data(self):
+        self.tribler_config.set_bami_data_enabled(True)
+
+    @experiment_callback
     async def start_session(self):
         from ipv8.configuration import get_default_configuration
         self._logger.info('Starting session')

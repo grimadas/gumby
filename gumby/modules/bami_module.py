@@ -21,7 +21,7 @@ class BamiPaymentCommunity(
 class BamiPaymentCommunityLauncher(IPv8CommunityLauncher):
 
     def should_launch(self, session):
-        return True
+        return session.config.get_bami_payment_enabled()
 
     def get_overlay_class(self):
         return BamiPaymentCommunity
@@ -84,7 +84,7 @@ class DataCommunity(BaseDataCommunity):
 class BamiDataCommunityLauncher(IPv8CommunityLauncher):
 
     def should_launch(self, session):
-        return True
+        return session.config.get_bami_data_enabled()
 
     def get_overlay_class(self):
         return DataCommunity

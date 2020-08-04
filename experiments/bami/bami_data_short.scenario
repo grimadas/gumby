@@ -2,6 +2,7 @@
 &module experiments.bami.bami_module.BamiDataExperiments
 
 @0:1 isolate_ipv8_overlay DataCommunity
+@0:1 enable_bami_data
 @0:2 start_session
 @0:10 introduce_peers
 @0:20 annotate group-forming
