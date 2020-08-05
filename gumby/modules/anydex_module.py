@@ -126,6 +126,28 @@ class AnyDexModule(ExperimentModule):
     async def stop_session(self):
         await self.ipv8.stop()
 
+    @experiment_callback
+    def write_overlay_statistics(self):
+        """
+        Write information about the IPv8 overlay networks to a file.
+        """
+        with open('overlays.txt', 'w') as overlays_file:
+            overlays_file.write("name,pub_key,peers\n")
+            for overlay in self.session.ipv8.overlays:
+                overlays_file.write("%s,%s,%d\n" % (overlay.__class__.__name__,
+                                                    hexlify(overlay.my_peer.public_key.key_to_bin()),
+                                                    len(overlay.get_peers())))
+
+        # Write verified peers
+        with open('verified_peers.txt', 'w') as peers_file:
+            for peer in self.session.ipv8.network.verified_peers:
+                peers_file.write('%d\n' % (peer.address[1] - 12000))
+
+        # Write bandwidth statistics
+        with open('bandwidth.txt', 'w') as bandwidth_file:
+            bandwidth_file.write("%d,%d" % (self.session.ipv8.endpoint.bytes_up,
+                                            self.session.ipv8.endpoint.bytes_down))
+
     def setup_config(self):
         if self.ipv8_port is None:
             self.ipv8_port = 12000 + self.experiment.my_id

@@ -12,5 +12,6 @@
 @0:33 start_creating_meta_blocks {1}
 @0:100 stop_creating_blobs {1}
 @0:100 annotate stop-creating-blocks
+@0:190 write_overlay_statistics
 @0:200 stop_session
 @0:205 stop
