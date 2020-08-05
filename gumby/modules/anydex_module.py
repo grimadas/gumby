@@ -133,20 +133,20 @@ class AnyDexModule(ExperimentModule):
         """
         with open('overlays.txt', 'w') as overlays_file:
             overlays_file.write("name,pub_key,peers\n")
-            for overlay in self.session.ipv8.overlays:
+            for overlay in self.ipv8.overlays:
                 overlays_file.write("%s,%s,%d\n" % (overlay.__class__.__name__,
                                                     hexlify(overlay.my_peer.public_key.key_to_bin()),
                                                     len(overlay.get_peers())))
 
         # Write verified peers
         with open('verified_peers.txt', 'w') as peers_file:
-            for peer in self.session.ipv8.network.verified_peers:
+            for peer in self.ipv8.network.verified_peers:
                 peers_file.write('%d\n' % (peer.address[1] - 12000))
 
         # Write bandwidth statistics
         with open('bandwidth.txt', 'w') as bandwidth_file:
-            bandwidth_file.write("%d,%d" % (self.session.ipv8.endpoint.bytes_up,
-                                            self.session.ipv8.endpoint.bytes_down))
+            bandwidth_file.write("%d,%d" % (self.ipv8.endpoint.bytes_up,
+                                            self.ipv8.endpoint.bytes_down))
 
     def setup_config(self):
         if self.ipv8_port is None:
