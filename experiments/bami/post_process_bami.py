@@ -8,6 +8,9 @@ from typing import Any, Dict, List
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import numpy as np
+
+from gumby.statsparser import StatisticsParser
 
 
 def get_experiment_files(out_dir: str) -> Dict[str, str]:
@@ -116,8 +119,76 @@ def process_block_times(out_dir: str) -> None:
     plot_throughput_reaction(output_dir, df, reactions=reacts)
 
 
+def plot_peer_bandwidth(out_dir: str, df: pd.DataFrame):
+    median = df.val.median()
+
+    def plot_mean(*args, **kwargs):
+        plt.axhline(median, *args, **kwargs)
+
+    plt.figure()
+    g = sns.FacetGrid(df, col="peer", aspect=1., col_wrap=4, height=3, )
+
+    g.fig.subplots_adjust(top=0.9)
+    g.fig.suptitle('Bandwidth by peer', fontsize=16)
+
+    g.map(sns.barplot, 'type', 'val', order=['up', 'down'])
+    g.map(plot_mean, ls=":", c=".3")
+    g.set_axis_labels(x_var='', y_var='Bandwidth (MB)')
+    save_path = os.path.join(out_dir, 'peer_bandwidth.png')
+    plt.savefig(save_path)
+
+
+def plot_total_bandwidth(out_dir: str, total_up: float, total_down: float) -> None:
+    lost = total_up - total_down
+    plt.figure()
+    g = sns.barplot(['total_up', 'total_down', 'lost'], [total_up, total_down, lost])
+
+    i = 0
+    for p in g.patches:
+        annotate_text = "{:.2f} ({:.1f}%)".format(p.get_height(), 100 * lost / total_up) \
+            if i == 2 else "{:.2f}".format(p.get_height())
+        g.annotate(annotate_text, (p.get_x() + p.get_width() / 2., p.get_height()),
+                   ha='center', va='center', fontsize=11, color='gray', xytext=(0, 20),
+                   textcoords='offset points')
+        i += 1
+
+    _ = g.set_ylim(0, max(p.get_height() + 10 for p in g.patches))  # To make space for the annotations
+    g.set_title('Total system bandwidth')
+    g.set_ylabel('Bandwidth (MB)')
+    save_path = os.path.join(out_dir, 'total_bandwidth.png')
+    plt.savefig(save_path)
+
+
+def process_bandwidth_files(out_dir: str) -> None:
+    parser = StatisticsParser(out_dir)
+    total_up, total_down = 0, 0
+    uploads = []
+    downs = []
+    peers = []
+
+    for peer_nr, filename, dir in parser.yield_files('bandwidth.txt'):
+        with open(filename) as bandwidth_file:
+            parts = bandwidth_file.read().rstrip('\n').split(",")
+            u, d = int(parts[0]) / (2 ** 20), int(parts[1]) / (2 ** 20)
+
+            uploads.append(u)
+            downs.append(d)
+            peers.append(peer_nr)
+
+            total_up += u
+            total_down += d
+    # Prepare bandwidth table
+    df = pd.DataFrame({'peer': np.array(peers),
+                       'up': np.array(uploads),
+                       'down': np.array(downs)})
+    df = pd.melt(df, id_vars="peer", var_name="type", value_name="val")
+    plot_peer_bandwidth(out_dir, df)
+    plot_total_bandwidth(out_dir, total_up, total_down)
+
+
 def run(out_dir: str) -> None:
     process_block_times(out_dir)
+    process_bandwidth_files(out_dir)
 
 
 # cd to the output directory
