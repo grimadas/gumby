@@ -134,6 +134,8 @@ class BamiDataExperiments(BaseBamiExperiments):
             num_producers = int(os.environ.get('NUM_PRODUCERS'))
         else:
             num_producers = -1
+        if os.environ.get('BLOCK_INTERVAL'):
+            interval = float(os.environ.get('BLOCK_INTERVAL'))
         if num_producers < 0 or self.my_id <= num_producers:
             self.blob_creation_tasks[peer_id] = run_task(self.create_random_blob, peer_id, blob_size,
                                                          interval=float(interval))
@@ -155,6 +157,10 @@ class BamiDataExperiments(BaseBamiExperiments):
             num_producers = int(os.environ.get('NUM_PRODUCERS'))
         else:
             num_producers = -1
+
+        if os.environ.get('BLOCK_INTERVAL'):
+            interval = float(os.environ.get('BLOCK_INTERVAL'))
+
         if num_producers < 0 or self.my_id <= num_producers:
             self.blob_creation_tasks['meta' + peer_id] = run_task(self.create_random_meta_block, peer_id,
                                                                   interval=float(interval))
