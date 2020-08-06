@@ -22,6 +22,7 @@ def get_experiment_files(out_dir: str) -> Dict[str, str]:
 def experiment_transactions(out_dir: str, exp_files: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
     txs = {}
     reactions = {}
+    types = {}
     for p_id, f in exp_files.items():
         full_path = os.path.join(out_dir, f)
         with open(full_path) as csvfile:
@@ -41,7 +42,8 @@ def experiment_transactions(out_dir: str, exp_files: Dict[str, str]) -> Dict[str
                     linked_tx = str(row['group_id']) + str(tx_val[b'dot'])
                     # Remember link
                     reactions[tx_id] = linked_tx
-    return txs, reactions
+                types[tx_id] = tx_type
+    return txs, reactions, types
 
 
 def get_latencies(df: pd.DataFrame, reactions: Dict) -> List[float]:
@@ -100,18 +102,19 @@ def plot_throughput_reaction(out_dir: str, df: pd.DataFrame, reactions: Dict) ->
     ax.get_figure().savefig(save_path)
 
 
-def plot_number_of_blocks(out_dir: str, df: pd.DataFrame) -> None:
+def plot_number_of_blocks(out_dir: str, df: pd.DataFrame, types: Dict) -> None:
     df2 = df.reset_index().melt(id_vars=['index']).dropna()
+    df2['type'] = df2.variable.transform(lambda x: types[x])
     plt.figure()
-    g = sns.countplot(data=df2, x='index', palette='Blues')
+    g = sns.countplot(data=df2, x='index', hue='type')
 
-    for p in g.patches:
-        annotate_text = "{:.2f}".format(p.get_height())
-        g.annotate(annotate_text, (p.get_x() + p.get_width() / 2., p.get_height()),
-                   ha='center', va='center', fontsize=11, color='#444', xytext=(0, 20),
-                   textcoords='offset points')
+    # for p in g.patches:
+    #    annotate_text = "{:.2f}".format(p.get_height())
+    #    g.annotate(annotate_text, (p.get_x() + p.get_width() / 2., p.get_height()),
+    #               ha='center', va='center', fontsize=11, color='#444', xytext=(0, 20),
+    #               textcoords='offset points')
 
-    _ = g.set_ylim(0, max(p.get_height() + 5 for p in g.patches))  # To make space for the annotations
+    # _ = g.set_ylim(0, max(p.get_height() + 5 for p in g.patches))  # To make space for the annotations
 
     g.set_title('Number of blocks finalized by peer')
     g.set_xlabel('Peer ID')
@@ -125,7 +128,7 @@ def process_block_times(out_dir: str) -> None:
     files = get_experiment_files(out_dir)
     print('Total number of block files', len(files))
     # Transactions for the experiments
-    txs, reacts = experiment_transactions(out_dir, files)
+    txs, reacts, types = experiment_transactions(out_dir, files)
     df = create_data_frame(txs)
     latencies = get_latencies(df, reactions=reacts)
 
@@ -136,7 +139,7 @@ def process_block_times(out_dir: str) -> None:
     plot_latency_df(output_dir, latencies)
     plot_throughput_raw(output_dir, df)
     plot_throughput_reaction(output_dir, df, reactions=reacts)
-    plot_number_of_blocks(output_dir, df)
+    plot_number_of_blocks(output_dir, df, types)
 
 
 def plot_peer_bandwidth(out_dir: str, df: pd.DataFrame):
