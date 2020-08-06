@@ -25,6 +25,8 @@ class BaseBamiExperiments(IPv8OverlayExperimentModule):
         self.block_stat_file = None
         self.start_time = None
 
+        self.blob_creation_tasks = {}
+
     def change_settings_from_environ(self):
         if os.environ.get('WITNESS_BLOCK_DELTA'):
             self.overlay.settings.witness_block_delta = int(float(os.environ.get('WITNESS_BLOCK_DELTA')))
