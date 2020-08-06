@@ -100,6 +100,25 @@ def plot_throughput_reaction(out_dir: str, df: pd.DataFrame, reactions: Dict) ->
     ax.get_figure().savefig(save_path)
 
 
+def plot_number_of_blocks(out_dir: str, df: pd.DataFrame) -> None:
+    df2 = df.reset_index().melt(id_vars=['index']).dropna()
+    plt.figure()
+    g = sns.countplot(data=df2, x='index', palette='Blues')
+
+    for p in g.patches:
+        annotate_text = "{:.2f}".format(p.get_height())
+        g.annotate(annotate_text, (p.get_x() + p.get_width() / 2., p.get_height()),
+                   ha='center', va='center', fontsize=11, color='#444', xytext=(0, 20),
+                   textcoords='offset points')
+
+    _ = g.set_ylim(0, max(p.get_height() + 5 for p in g.patches))  # To make space for the annotations
+
+    g.set_title('Number of blocks finalized by peer')
+    g.set_xlabel('Peer ID')
+    save_path = os.path.join(out_dir, "num_blocks_by_peer.png")
+    g.get_figure().savefig(save_path)
+
+
 def process_block_times(out_dir: str) -> None:
     # Get files to process in the experiment
     print('Processing block times on dir', out_dir)
@@ -117,6 +136,7 @@ def process_block_times(out_dir: str) -> None:
     plot_latency_df(output_dir, latencies)
     plot_throughput_raw(output_dir, df)
     plot_throughput_reaction(output_dir, df, reactions=reacts)
+    plot_number_of_blocks(output_dir, df)
 
 
 def plot_peer_bandwidth(out_dir: str, df: pd.DataFrame):
