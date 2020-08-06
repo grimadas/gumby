@@ -1,4 +1,5 @@
 from base64 import b64encode, b64decode
+import os
 from os import environ
 from random import sample
 from socket import gethostbyname
@@ -109,6 +110,9 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         if self.my_id in excluded_peers_list:
             self._logger.info("Not participating in the peer introductions!")
             return
+
+        if os.environ.get('MAX_PEERS'):
+            max_peers = int(os.environ.get('MAX_PEERS'))
 
         if not max_peers:
             # bootstrap the peer introduction, ensuring everybody knows everybody to start off with.

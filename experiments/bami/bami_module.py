@@ -112,10 +112,6 @@ class BamiDataExperiments(BaseBamiExperiments):
         self.init_block_stat_file()
 
     @experiment_callback
-    def start_creating_blobs(self) -> None:
-        self.overlay.push_data_blob()
-
-    @experiment_callback
     def join_group(self, peer_id: str = '1') -> None:
         self.join_subcommunity_by_peer_id(peer_id)
 
@@ -134,8 +130,13 @@ class BamiDataExperiments(BaseBamiExperiments):
 
     @experiment_callback
     def start_creating_blobs(self, interval: float = 1, peer_id: str = '1', blob_size: int = 300) -> None:
-        self.blob_creation_tasks[peer_id] = run_task(self.create_random_blob, peer_id, blob_size,
-                                                     interval=float(interval))
+        if os.environ.get('NUM_PRODUCERS'):
+            num_producers = int(os.environ.get('NUM_PRODUCERS'))
+        else:
+            num_producers = -1
+        if num_producers < 0 or self.my_id <= num_producers:
+            self.blob_creation_tasks[peer_id] = run_task(self.create_random_blob, peer_id, blob_size,
+                                                         interval=float(interval))
 
     @experiment_callback
     def stop_creating_blobs(self):
@@ -150,8 +151,13 @@ class BamiDataExperiments(BaseBamiExperiments):
 
     @experiment_callback
     def start_creating_meta_blocks(self, interval: float = 1, peer_id: str = '1') -> None:
-        self.blob_creation_tasks['meta' + peer_id] = run_task(self.create_random_meta_block, peer_id,
-                                                              interval=float(interval))
+        if os.environ.get('NUM_PRODUCERS'):
+            num_producers = int(os.environ.get('NUM_PRODUCERS'))
+        else:
+            num_producers = -1
+        if num_producers < 0 or self.my_id <= num_producers:
+            self.blob_creation_tasks['meta' + peer_id] = run_task(self.create_random_meta_block, peer_id,
+                                                                  interval=float(interval))
 
     @experiment_callback
     def stop_creating_meta_blocks(self):
