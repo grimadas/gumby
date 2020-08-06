@@ -105,16 +105,16 @@ def plot_throughput_reaction(out_dir: str, df: pd.DataFrame, reactions: Dict) ->
 def plot_number_of_blocks(out_dir: str, df: pd.DataFrame, types: Dict) -> None:
     df2 = df.reset_index().melt(id_vars=['index']).dropna()
     df2['type'] = df2.variable.transform(lambda x: types[x])
-    plt.figure()
+    plt.figure(figsize=(20, 10))
     g = sns.countplot(data=df2, x='index', hue='type')
+    g.set_ylim(0, max(p.get_height() + 5 for p in g.patches))  # To make space for the annotations
+    g.tick_params(labelsize=6)
 
     # for p in g.patches:
     #    annotate_text = "{:.2f}".format(p.get_height())
     #    g.annotate(annotate_text, (p.get_x() + p.get_width() / 2., p.get_height()),
     #               ha='center', va='center', fontsize=11, color='#444', xytext=(0, 20),
     #               textcoords='offset points')
-
-    # _ = g.set_ylim(0, max(p.get_height() + 5 for p in g.patches))  # To make space for the annotations
 
     g.set_title('Number of blocks finalized by peer')
     g.set_xlabel('Peer ID')
@@ -151,7 +151,7 @@ def plot_peer_bandwidth(out_dir: str, df: pd.DataFrame):
     plt.figure()
     g = sns.FacetGrid(df, col="peer", aspect=1., col_wrap=4, height=3, )
 
-    g.fig.subplots_adjust(top=0.9)
+    g.fig.subplots_adjust(top=1.0)
     g.fig.suptitle('Bandwidth by peer', fontsize=16)
 
     g.map(sns.barplot, 'type', 'val', order=['up', 'down'])

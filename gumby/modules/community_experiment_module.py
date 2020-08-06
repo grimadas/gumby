@@ -113,6 +113,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
 
         if os.environ.get('MAX_PEERS'):
             max_peers = int(os.environ.get('MAX_PEERS'))
+            self._logger.info("Using experiment environment max peers {}!".format(max_peers))
 
         if not max_peers:
             # bootstrap the peer introduction, ensuring everybody knows everybody to start off with.
