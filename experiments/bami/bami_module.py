@@ -199,7 +199,7 @@ class BamiPaymentExperiments(BaseBamiExperiments):
         print("Mint request performed!")
 
     @experiment_callback
-    def transfer(self, group_experiment_id: str, counter_party_id: str, value: str):
+    def transfer(self, group_experiment_id: str, counter_party_id: str, value: str) -> None:
         context = self.overlay.context
         group_id = b64decode(self.get_peer_public_key(group_experiment_id))
         counter_party_key_id = b64decode(self.get_peer_public_key(counter_party_id))
@@ -208,3 +208,28 @@ class BamiPaymentExperiments(BaseBamiExperiments):
             self.overlay.spend(group_id, counter_party_key_id, value=value)
         except InsufficientBalanceException as e:
             print("Balance is not sufficient ", e)
+
+    def random_transfer(self, group_id: str, value: str) -> None:
+        from random import choice
+        counter_peer = choice(list(set(self.all_vars.keys()) - {self.my_id}))
+        self.transfer(group_id, counter_peer, value)
+
+    @experiment_callback
+    def start_transfering_randomly(self, interval: float = 1, peer_id: str = '1', transfer_amount: str = '1') -> None:
+        if os.environ.get('NUM_PRODUCERS'):
+            num_producers = int(os.environ.get('NUM_PRODUCERS'))
+        else:
+            num_producers = -1
+
+        if os.environ.get('BLOCK_INTERVAL'):
+            interval = float(os.environ.get('BLOCK_INTERVAL'))
+
+        if num_producers < 0 or self.my_id <= num_producers:
+            # Choose counter-party peer:
+            self.blob_creation_tasks[peer_id] = run_task(self.random_transfer, peer_id, transfer_amount,
+                                                         interval=float(interval))
+
+    @experiment_callback
+    def stop_creating_blocks(self):
+        for task in self.blob_creation_tasks.values():
+            task.cancel()
