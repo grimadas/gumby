@@ -151,7 +151,7 @@ def plot_peer_bandwidth(out_dir: str, df: pd.DataFrame):
     plt.figure()
     g = sns.FacetGrid(df, col="peer", aspect=1., col_wrap=4, height=3, )
 
-    g.fig.subplots_adjust(top=1.0)
+    g.fig.subplots_adjust(top=0.5)
     g.fig.suptitle('Bandwidth by peer', fontsize=16)
 
     g.map(sns.barplot, 'type', 'val', order=['up', 'down'])

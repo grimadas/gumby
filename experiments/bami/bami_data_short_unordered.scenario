@@ -9,7 +9,6 @@
 @0:21 join_group 1
 @0:30 annotate start-creating-blocks
 @0:30 start_creating_blobs
-@0:33 start_creating_meta_blocks
 @0:100 stop_creating_blobs
 @0:100 annotate stop-creating-blocks
 @0:190 write_overlay_statistics
