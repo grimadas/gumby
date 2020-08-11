@@ -1,7 +1,8 @@
 from base64 import b64encode, b64decode
+from itertools import cycle, islice
 import os
 from os import environ
-from random import sample
+from random import Random
 from socket import gethostbyname
 
 from gumby.experiment import experiment_callback
@@ -97,7 +98,7 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         self.overlay.walk_to(self.experiment.get_peer_ip_port_by_id(peer_id))
 
     @experiment_callback
-    def introduce_peers(self, max_peers=None, excluded_peers=None):
+    def introduce_peers(self, max_peers: int = None, excluded_peers: str = None):
         """
         Introduce peers to each other.
         :param max_peers: If specified, this peer will walk to this number of peers at most.
@@ -114,23 +115,24 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         if os.environ.get('WALK_PEERS'):
             max_peers = int(os.environ.get('WALK_PEERS'))
             self._logger.info("Walking to {} random peers.".format(max_peers))
+        elif not max_peers:
+            max_peers = len(self.all_vars.keys()) // 2
 
-        if not max_peers:
-            # bootstrap the peer introduction, ensuring everybody knows everybody to start off with.
-            for peer_id in self.all_vars.keys():
-                if int(peer_id) != self.my_id and int(peer_id) not in excluded_peers_list:
-                    self.overlay.walk_to(self.experiment.get_peer_ip_port_by_id(peer_id))
+        if os.environ.get('WALK_SEED'):
+            walk_seed = int(os.environ.get('WALK_SEED'))
         else:
-            # Walk to a number of peers
-            eligible_peers = [peer_id for peer_id in self.all_vars.keys()
-                              if int(peer_id) not in excluded_peers_list and int(peer_id) != self.my_id]
-            max_peers = min(len(eligible_peers), int(max_peers))
-            rand_peer_ids = sample(eligible_peers, int(max_peers))
+            walk_seed = 1
 
-            for rand_peer_id in rand_peer_ids:
-                peer_address = self.experiment.get_peer_ip_port_by_id(rand_peer_id)
-                self._logger.info('Walking to %s', peer_address)
-                self.overlay.walk_to(peer_address)
+        # Walk to a number of peers
+        rand = Random(walk_seed)
+        mixed_peers = list(self.all_vars.keys())
+        rand.shuffle(mixed_peers)
+        vars = islice(cycle(mixed_peers), mixed_peers.index(str(self.my_id)) + 1, None)
+        for _ in range(max_peers):
+            next_peer = next(vars)
+            peer_address = self.experiment.get_peer_ip_port_by_id(next_peer)
+            self._logger.info('Walking to %s', peer_address)
+            self.overlay.walk_to(peer_address)
 
     @experiment_callback
     def add_walking_strategy(self, name, max_peers, **kwargs):
