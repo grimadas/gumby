@@ -53,6 +53,12 @@ class BaseBamiExperiments(IPv8OverlayExperimentModule):
         if os.environ.get('DIVERSITY_CONFIRM'):
             self.overlay.settings.diversity_confirm = int(os.environ.get('DIVERSITY_CONFIRM'))
 
+        # Peer limits on the communities
+        if os.environ.get('MAIN_MAX_PEERS'):
+            self.overlay.settings.main_max_peers = int(os.environ.get('MAIN_MAX_PEERS'))
+        if os.environ.get('SUBCOM_MAX_PEERS'):
+            self.overlay.settings.subcom_max_peers = int(os.environ.get('SUBCOM_MAX_PEERS'))
+
         # Gossip interval distributions
         if os.environ.get('GOSSIP_INTERVAL_DIST'):
             self.overlay.settings.gossip_interval_dist = os.environ.get('GOSSIP_INTERVAL_DIST')

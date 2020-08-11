@@ -82,7 +82,7 @@ class DataCommunity(BaseDataCommunity):
 
             print('Creating delay function', delay_dist_func())
 
-        self.start_gossip_sync(sub_com_id, interval=interval_dist_func(), delay=delay_dist_func())
+        self.start_gossip_sync(sub_com_id, interval=interval_dist_func(), delay=interval_dist_func())
         self.subscribe_out_order_block(sub_com_id, self.process_data_block)
 
         # 2. Meta-data on the data blocks, process them in-order
