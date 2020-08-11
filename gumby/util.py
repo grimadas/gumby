@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 import os
 from asyncio import coroutine, ensure_future, iscoroutinefunction, sleep
+from ast import literal_eval as make_tuple
+from random import choices
+from typing import Dict, List, Union
 
 
 def generate_keypair_trustchain():
@@ -55,3 +60,48 @@ def run_task(task, *args, delay=0, interval=0):
     else:
         task = ensure_future(task(*args))
     return task
+
+
+class Dist(object):
+
+    def __init__(self, name: str, params: Union[List, str]) -> None:
+        """Create statistical distribution using sci-py """
+        self.name: str = name
+        self.params: Union[List, str] = params
+
+    def to_repr(self) -> Dict[str, Dict[str, str]]:
+        return {self.__class__.__name__: {'name': self.name, 'params': str(self.params)}}
+
+    def __str__(self) -> str:
+        return self.__class__.__name__ + ": " + str(self.name) + str(self.params)
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + ": " + str(self.name) + str(self.params)
+
+    @classmethod
+    def from_repr(cls, yaml_dict) -> Dist:
+        """Create Dist object from canonical dict representation"""
+        return cls(**yaml_dict)
+
+    def generate(self, n: int = 1) -> List[float]:
+        """
+        Generate 'n' random values with given distribution
+        """
+        if self.name == 'sample':
+            weights = self.params['weights'] if 'weights' in self.params else None
+            values = self.params['values'] if 'values' in self.params \
+                else self.params
+            weights = make_tuple(weights) if type(weights) == str else weights
+            values = make_tuple(values) if type(values) == str else values
+            res = choices(values, weights=weights, k=n)
+            return res if n != 1 else res[0]
+
+        import scipy.stats
+
+        dist = getattr(scipy.stats, self.name)
+        param = make_tuple(self.params) if type(self.params) == str else self.params
+        return dist.rvs(*param[:-2], loc=param[-2], scale=param[-1], size=n)
+
+    def get(self) -> float:
+        """Get one random value from the given distribution"""
+        return self.generate(1)[0]

@@ -53,6 +53,12 @@ class BaseBamiExperiments(IPv8OverlayExperimentModule):
         if os.environ.get('DIVERSITY_CONFIRM'):
             self.overlay.settings.diversity_confirm = int(os.environ.get('DIVERSITY_CONFIRM'))
 
+        # Gossip interval distributions
+        if os.environ.get('GOSSIP_INTERVAL_DIST'):
+            self.overlay.settings.gossip_interval_dist = os.environ.get('GOSSIP_INTERVAL_DIST')
+        if os.environ.get('GOSSIP_DELAY_DIST'):
+            self.overlay.settings.gossip_delay_dist = os.environ.get('GOSSIP_DELAY_DIST')
+
     def on_ipv8_available(self, _):
         # Disable threadpool messages
         self.overlay._use_main_thread = True
