@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 
 from bami.backbone.block import BamiBlock
 from bami.backbone.community import BamiCommunity, BlockResponse
-from bami.backbone.sub_community import IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy
+from bami.backbone.sub_community import IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy, NoSubCommunityDiscovery
 from bami.payment.community import PaymentCommunity
 from ipv8.peer import Peer
 
@@ -31,7 +31,7 @@ class BamiPaymentCommunityLauncher(IPv8CommunityLauncher):
         return Peer(session.trustchain_keypair)
 
 
-class BaseDataCommunity(IPv8SubCommunityFactory, RandomWalkDiscoveryStrategy, BamiCommunity, metaclass=ABCMeta):
+class BaseDataCommunity(IPv8SubCommunityFactory, NoSubCommunityDiscovery, BamiCommunity, metaclass=ABCMeta):
 
     def witness_tx_well_formatted(self, witness_tx: Any) -> bool:
         pass
