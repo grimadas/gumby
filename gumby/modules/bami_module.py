@@ -73,10 +73,14 @@ class DataCommunity(BaseDataCommunity):
         if hasattr(self.settings, 'gossip_interval_dist'):
             interval_dist = self.parse_dist(self.settings.gossip_interval_dist)
             def interval_dist_func(): return interval_dist.get()
+
+            print('Creating interval function', interval_dist_func())
         delay_dist_func = None
         if hasattr(self.settings, 'gossip_delay_dist'):
             delay_dist = self.parse_dist(self.settings.gossip_delay_dist)
             def delay_dist_func(): return delay_dist.get()
+
+            print('Creating delay function', delay_dist_func())
 
         self.start_gossip_sync(sub_com_id, interval=interval_dist_func, delay=delay_dist_func)
         self.subscribe_out_order_block(sub_com_id, self.process_data_block)
