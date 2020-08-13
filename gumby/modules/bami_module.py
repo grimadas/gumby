@@ -31,7 +31,7 @@ class BamiPaymentCommunityLauncher(IPv8CommunityLauncher):
         return Peer(session.trustchain_keypair)
 
 
-class BaseDataCommunity(IPv8SubCommunityFactory, NoSubCommunityDiscovery, BamiCommunity, metaclass=ABCMeta):
+class BaseDataCommunity(IPv8SubCommunityFactory, BamiCommunity, metaclass=ABCMeta):
 
     def witness_tx_well_formatted(self, witness_tx: Any) -> bool:
         pass
@@ -52,7 +52,7 @@ class BaseDataCommunity(IPv8SubCommunityFactory, NoSubCommunityDiscovery, BamiCo
         pass
 
 
-class DataCommunity(BaseDataCommunity):
+class MetaDataCommunity(BaseDataCommunity, metaclass=ABCMeta):
     META_PREFIX = b'meta'
 
     def process_data_block(self, block: BamiBlock) -> None:
@@ -61,23 +61,19 @@ class DataCommunity(BaseDataCommunity):
     def process_meta_block(self, block: BamiBlock) -> None:
         pass
 
-    @staticmethod
-    def parse_dist(raw_dist: str) -> Dist:
-        name, params = raw_dist.split(',', 1)
-        params = params.strip()
-        return Dist(name, params)
-
     def join_subcommunity_gossip(self, sub_com_id: bytes) -> None:
         # 1. Data chain: exchange data blobs, process them out of order.
         interval_dist_func = None
         if hasattr(self.settings, 'gossip_interval_dist'):
-            interval_dist = self.parse_dist(self.settings.gossip_interval_dist)
+            interval_dist = Dist.from_raw_str(self.settings.gossip_interval_dist)
+
             def interval_dist_func(): return interval_dist.get()
 
             print('Creating interval function', interval_dist_func())
         delay_dist_func = None
         if hasattr(self.settings, 'gossip_delay_dist'):
-            delay_dist = self.parse_dist(self.settings.gossip_delay_dist)
+            delay_dist = Dist.from_raw_str(self.settings.gossip_delay_dist)
+
             def delay_dist_func(): return delay_dist.get()
 
             print('Creating delay function', delay_dist_func())
@@ -103,6 +99,14 @@ class DataCommunity(BaseDataCommunity):
         self.share_in_community(blk, chain_id)
 
 
+class DataCommunity(MetaDataCommunity, NoSubCommunityDiscovery):
+    pass
+
+
+class DataCommunityWithDiscovery(MetaDataCommunity, RandomWalkDiscoveryStrategy):
+    pass
+
+
 class BamiDataCommunityLauncher(IPv8CommunityLauncher):
 
     def should_launch(self, session):
@@ -110,6 +114,18 @@ class BamiDataCommunityLauncher(IPv8CommunityLauncher):
 
     def get_overlay_class(self):
         return DataCommunity
+
+    def get_my_peer(self, ipv8, session):
+        return Peer(session.trustchain_keypair)
+
+
+class BamiDataCommunityWithDiscoveryLauncher(IPv8CommunityLauncher):
+
+    def should_launch(self, session):
+        return session.config.get_bami_data_wd_enabled()
+
+    def get_overlay_class(self):
+        return DataCommunityWithDiscovery
 
     def get_my_peer(self, ipv8, session):
         return Peer(session.trustchain_keypair)

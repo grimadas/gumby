@@ -14,7 +14,7 @@ from gumby.experiment import experiment_callback
 from gumby.modules.bami_module import BamiPaymentCommunity, DataCommunity
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
 from gumby.modules.experiment_module import static_module
-from gumby.util import run_task
+from gumby.util import Dist, run_task
 
 
 class BaseBamiExperiments(IPv8OverlayExperimentModule):
@@ -26,6 +26,7 @@ class BaseBamiExperiments(IPv8OverlayExperimentModule):
         self.start_time = None
 
         self.blob_creation_tasks = {}
+        self.my_groups = []
 
     def change_settings_from_environ(self):
         if os.environ.get('WITNESS_BLOCK_DELTA'):
@@ -137,22 +138,55 @@ class BamiDataExperiments(BaseBamiExperiments):
         self.overlay.subscribe_in_order_block(meta_prefix + com_id, self.add_block)
 
     @experiment_callback
-    def create_random_blob(self, peer_id: str, blob_size: int) -> None:
+    def join_random_groups(self) -> None:
+        if os.environ.get('JOIN_GROUPS'):
+            num_groups_dist = Dist.from_raw_str(os.environ.get('JOIN_GROUPS'))
+            seed = int(os.environ.get('GROUPS_SEED'))
+            seed = seed if seed else 1
+            nums = num_groups_dist.generate(len(self.all_vars.keys()), seed=seed)
+            self.my_groups = list(range(1, nums[int(self.my_id) - 1] + 1)) if int(self.my_id) else []
+            print('joining ', len(self.my_groups), ' groups')
+            # Write bandwidth statistics
+        else:
+            self.my_groups = [1]
+        for exp_id in self.my_groups:
+            peer_id = str(exp_id)
+            # Join sub-community defined by the group
+            self.join_subcommunity_by_peer_id(peer_id)
+            com_id = b64decode(self.get_peer_public_key(peer_id))
+            self.overlay.subscribe_out_order_block(com_id, self.add_block)
+
+            # 2. Meta-data on the data blocks, process them in-order
+            meta_prefix = self.META_PREFIX
+            self.overlay.subscribe_in_order_block(meta_prefix + com_id, self.add_block)
+
+    @experiment_callback
+    def create_random_blob(self, blob_size: int, peer_id: str) -> None:
         blob = encode_raw(b'0' * int(blob_size))
         com_id = b64decode(self.get_peer_public_key(peer_id))
         self.overlay.push_data_blob(blob, com_id)
 
     @experiment_callback
-    def start_creating_blobs(self, interval: float = 1, peer_id: str = '1', blob_size: int = 300) -> None:
+    def start_creating_blobs(self, interval: float = 1, blob_size: int = 300) -> None:
         if os.environ.get('NUM_PRODUCERS'):
             num_producers = int(os.environ.get('NUM_PRODUCERS'))
         else:
             num_producers = -1
         if os.environ.get('BLOCK_INTERVAL'):
-            interval = float(os.environ.get('BLOCK_INTERVAL'))
+            interval = Dist.from_raw_str(os.environ.get('BLOCK_INTERVAL'))
+        else:
+            interval = Dist.from_raw_str(str(interval))
+        if os.environ.get('BLOCK_DELAY'):
+            delay = Dist.from_raw_str(os.environ.get('BLOCK_DELAY'))
+        else:
+            delay = Dist.from_raw_str('uniform,(1,1)')
         if num_producers < 0 or self.my_id <= num_producers:
-            self.blob_creation_tasks[peer_id] = run_task(self.create_random_blob, peer_id, blob_size,
-                                                         interval=float(interval))
+            for peer_id in self.my_groups:
+                self.blob_creation_tasks[str(peer_id)] = run_task(self.create_random_blob,
+                                                                  blob_size,
+                                                                  str(peer_id),
+                                                                  interval=interval.get(),
+                                                                  delay=delay.get())
 
     @experiment_callback
     def stop_creating_blobs(self):
@@ -195,6 +229,25 @@ class BamiPaymentExperiments(BaseBamiExperiments):
         self.init_block_stat_file()
 
     @experiment_callback
+    def join_random_groups(self) -> None:
+        if os.environ.get('JOIN_GROUPS'):
+            num_groups_dist = Dist.from_raw_str(os.environ.get('JOIN_GROUPS'))
+            seed = int(os.environ.get('GROUPS_SEED'))
+            seed = seed if seed else 1
+            nums = num_groups_dist.generate(len(self.all_vars.keys()), seed=seed)
+            self.my_groups = list(range(1, nums[int(self.my_id) - 1] + 1)) if int(self.my_id) else []
+            print('joining ', len(self.my_groups), ' groups')
+            # Write bandwidth statistics
+        else:
+            self.my_groups = [1]
+        for exp_id in self.my_groups:
+            peer_id = str(exp_id)
+            # Join sub-community defined by the group
+            self.join_subcommunity_by_peer_id(peer_id)
+            com_id = b64decode(self.get_peer_public_key(peer_id))
+            self.overlay.subscribe_in_order_block(com_id, self.add_block)
+
+    @experiment_callback
     def join_group(self, peer_id: str) -> None:
         self.join_subcommunity_by_peer_id(peer_id)
 
@@ -209,8 +262,10 @@ class BamiPaymentExperiments(BaseBamiExperiments):
             value = Decimal(99, context)
         else:
             value = Decimal(val, context)
-        self.overlay.mint(value=value)
-        print("Mint request performed!")
+
+        if int(self.my_id) in self.my_groups:
+            self.overlay.mint(value=value)
+            print("Mint request performed!")
 
     @experiment_callback
     def transfer(self, group_experiment_id: str, counter_party_id: str, value: str) -> None:
@@ -223,25 +278,36 @@ class BamiPaymentExperiments(BaseBamiExperiments):
         except InsufficientBalanceException as e:
             print("Balance is not sufficient ", e)
 
-    def random_transfer(self, group_id: str, value: str) -> None:
+    def random_transfer(self, group_id: str, value_dist: Dist) -> None:
         from random import choice
         counter_peer = choice(list(set(self.all_vars.keys()) - {self.my_id}))
-        self.transfer(group_id, counter_peer, value)
+        self.transfer(group_id, counter_peer, value_dist.get())
 
     @experiment_callback
-    def start_transfering_randomly(self, interval: float = 1, peer_id: str = '1', transfer_amount: str = '1') -> None:
+    def start_transfering_randomly(self, interval: float = 1, transfer_amount: str = '1') -> None:
         if os.environ.get('NUM_PRODUCERS'):
             num_producers = int(os.environ.get('NUM_PRODUCERS'))
         else:
             num_producers = -1
-
         if os.environ.get('BLOCK_INTERVAL'):
-            interval = float(os.environ.get('BLOCK_INTERVAL'))
-
+            interval = Dist.from_raw_str(os.environ.get('BLOCK_INTERVAL'))
+        else:
+            interval = Dist.from_raw_str(str(interval))
+        if os.environ.get('BLOCK_DELAY'):
+            delay = Dist.from_raw_str(os.environ.get('BLOCK_DELAY'))
+        else:
+            delay = Dist.from_raw_str('uniform,(1,1)')
+        if os.environ.get('TRANSFER_DIST'):
+            transfer_amount = Dist.from_raw_str(os.environ.get('TRANSFER_DIST'))
+        else:
+            transfer_amount = Dist.from_raw_str(transfer_amount)
         if num_producers < 0 or self.my_id <= num_producers:
-            # Choose counter-party peer:
-            self.blob_creation_tasks[peer_id] = run_task(self.random_transfer, peer_id, transfer_amount,
-                                                         interval=float(interval))
+            for peer_id in self.my_groups:
+                self.blob_creation_tasks[str(peer_id)] = run_task(self.random_transfer,
+                                                                  str(peer_id),
+                                                                  transfer_amount,
+                                                                  interval=interval.get(),
+                                                                  delay=delay.get())
 
     @experiment_callback
     def stop_creating_blocks(self):

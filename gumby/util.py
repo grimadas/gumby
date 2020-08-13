@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import os
-from asyncio import coroutine, ensure_future, iscoroutinefunction, sleep
 from ast import literal_eval as make_tuple
+from asyncio import coroutine, ensure_future, iscoroutinefunction, sleep
+import os
 from random import choices
 from typing import Dict, List, Union
 
@@ -79,29 +79,44 @@ class Dist(object):
         return self.__class__.__name__ + ": " + str(self.name) + str(self.params)
 
     @classmethod
+    def from_raw_str(cls, raw_dist: str) -> Dist:
+        vals = raw_dist.split(',', 1)
+        if len(vals) == 1:
+            name = 'const'
+            params = vals[0]
+        else:
+            name, params = vals
+        params = params.strip()
+        return cls(name, params)
+
+    @classmethod
     def from_repr(cls, yaml_dict) -> Dist:
         """Create Dist object from canonical dict representation"""
         return cls(**yaml_dict)
 
-    def generate(self, n: int = 1) -> List[float]:
+    def generate(self, n: int = 1, seed: int = None) -> List[float]:
         """
         Generate 'n' random values with given distribution
         """
+        if self.name == 'const':
+            return [float(self.params)]*n
         if self.name == 'sample':
             weights = self.params['weights'] if 'weights' in self.params else None
             values = self.params['values'] if 'values' in self.params \
                 else self.params
             weights = make_tuple(weights) if type(weights) == str else weights
             values = make_tuple(values) if type(values) == str else values
-            res = choices(values, weights=weights, k=n)
-            return res if n != 1 else res[0]
+            return choices(values, weights=weights, k=n)
 
         import scipy.stats
 
         dist = getattr(scipy.stats, self.name)
         param = make_tuple(self.params) if type(self.params) == str else self.params
-        return dist.rvs(*param[:-2], loc=param[-2], scale=param[-1], size=n)
+        try:
+            return dist.rvs(*param[:-2], loc=param[-2], scale=param[-1], size=n)
+        except TypeError:
+            return dist.rvs(*param[:-1], loc=param[-1], size=n)
 
-    def get(self) -> float:
+    def get(self, seed: int = None) -> float:
         """Get one random value from the given distribution"""
-        return self.generate(1)[0]
+        return self.generate(1, seed)[0]

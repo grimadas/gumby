@@ -30,6 +30,9 @@ class AnyDexConfig(object):
                 },
                 'data': {
                     'enabled': False
+                },
+                'data_wd': {
+                    'enabled': False
                 }
             }
         }
@@ -79,6 +82,12 @@ class AnyDexConfig(object):
 
     def set_bami_data_enabled(self, value: bool) -> None:
         self.config['bami']['data']["enabled"] = value
+
+    def get_bami_data_wd_enabled(self) -> bool:
+        return self.config['bami']['data_wd']['enabled']
+
+    def set_bami_data_wd_enabled(self, value: bool) -> None:
+        self.config['bami']['data_wd']["enabled"] = value
 
     def set_ipv8_statistics(self, value):
         self.config['ipv8']['statistics'] = value

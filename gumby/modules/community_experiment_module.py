@@ -1,17 +1,17 @@
-from base64 import b64encode, b64decode
+from base64 import b64decode, b64encode
 from itertools import cycle, islice
 import os
 from os import environ
 from random import Random
 from socket import gethostbyname
 
-from gumby.experiment import experiment_callback
-from gumby.modules.experiment_module import ExperimentModule
-from gumby.util import generate_keypair_trustchain, save_keypair_trustchain, save_pub_key_trustchain
-
 from ipv8.peer import Peer
 from ipv8.peerdiscovery.churn import RandomChurn
 from ipv8.peerdiscovery.discovery import EdgeWalk, RandomWalk
+
+from gumby.experiment import experiment_callback
+from gumby.modules.experiment_module import ExperimentModule
+from gumby.util import generate_keypair_trustchain, save_keypair_trustchain, save_pub_key_trustchain
 
 
 class IPv8OverlayExperimentModule(ExperimentModule):
@@ -98,9 +98,47 @@ class IPv8OverlayExperimentModule(ExperimentModule):
         self.overlay.walk_to(self.experiment.get_peer_ip_port_by_id(peer_id))
 
     @experiment_callback
+    def introduce_peers_with_ipv8_intro(self, max_peers: int = None, excluded_peers: str = None):
+        """
+        Introduce peers to each other, will form a circle with a given seed.
+        :param max_peers: If specified, this peer will walk to this number of peers at most.
+        :param excluded_peers: If specified, this method will ignore a specific peer from the introductions.
+        """
+        excluded_peers_list = []
+        if excluded_peers:
+            excluded_peers_list = [int(excluded_peer) for excluded_peer in excluded_peers.split(",")]
+
+        if self.my_id in excluded_peers_list:
+            self._logger.info("Not participating in the peer introductions!")
+            return
+
+        if os.environ.get('WALK_PEERS'):
+            max_peers = int(os.environ.get('WALK_PEERS'))
+            self._logger.info("Walking to {} random peers.".format(max_peers))
+        elif not max_peers:
+            max_peers = len(self.all_vars.keys()) // 2
+
+        if os.environ.get('WALK_SEED'):
+            walk_seed = int(os.environ.get('WALK_SEED'))
+        else:
+            walk_seed = 1
+
+        # Walk to a number of peers
+        rand = Random(walk_seed)
+        mixed_peers = list(self.all_vars.keys())
+        rand.shuffle(mixed_peers)
+        vars = islice(cycle(mixed_peers), mixed_peers.index(str(self.my_id)) + 1, None)
+        for _ in range(max_peers):
+            next_peer = next(vars)
+            peer_address = self.experiment.get_peer_ip_port_by_id(next_peer)
+            self._logger.info('Walking to %s', peer_address)
+            self.overlay.walk_to(peer_address)
+        self.overlay.start_discovery()
+
+    @experiment_callback
     def introduce_peers(self, max_peers: int = None, excluded_peers: str = None):
         """
-        Introduce peers to each other.
+        Introduce peers to each other, will form a circle with a given seed.
         :param max_peers: If specified, this peer will walk to this number of peers at most.
         :param excluded_peers: If specified, this method will ignore a specific peer from the introductions.
         """

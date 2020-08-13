@@ -8,7 +8,8 @@ from ipv8_service import IPv8
 
 from gumby.anydex_config import AnyDexConfig
 from gumby.experiment import experiment_callback
-from gumby.modules.bami_module import BamiPaymentCommunityLauncher, BamiDataCommunityLauncher
+from gumby.modules.bami_module import BamiDataCommunityWithDiscoveryLauncher, BamiPaymentCommunityLauncher, \
+    BamiDataCommunityLauncher
 from gumby.modules.community_launcher import DHTCommunityLauncher, MarketCommunityLauncher, TrustChainCommunityLauncher
 from gumby.modules.experiment_module import ExperimentModule, static_module
 from gumby.modules.isolated_community_loader import IsolatedIPv8CommunityLoader
@@ -79,6 +80,7 @@ class AnyDexModule(ExperimentModule):
         loader.set_launcher(DHTCommunityLauncher())
         loader.set_launcher(BamiPaymentCommunityLauncher())
         loader.set_launcher(BamiDataCommunityLauncher())
+        loader.set_launcher(BamiDataCommunityWithDiscoveryLauncher())
         return loader
 
     @experiment_callback
@@ -88,6 +90,10 @@ class AnyDexModule(ExperimentModule):
     @experiment_callback
     def enable_bami_data(self):
         self.tribler_config.set_bami_data_enabled(True)
+
+    @experiment_callback
+    def enable_bami_data_wd(self):
+        self.tribler_config.set_bami_data_wd_enabled(True)
 
     @experiment_callback
     async def start_session(self):

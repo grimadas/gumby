@@ -1,14 +1,14 @@
 &module gumby.modules.anydex_module.AnyDexModule
 &module experiments.bami.bami_module.BamiDataExperiments
 
-@0:1 isolate_ipv8_overlay DataCommunity
-@0:1 enable_bami_data
+@0:1 isolate_ipv8_overlay DataCommunityWithDiscovery
+@0:1 enable_bami_data_wd
 @0:2 start_session
-@0:10 introduce_peers
+@0:10 introduce_peers_with_ipv8_intro
 @0:20 annotate group-forming
 @0:21 join_random_groups
 @0:30 annotate start-creating-blocks
-@0:30 start_creating_meta_blocks
+@0:30 start_creating_blobs
 @0:100 stop_creating_blobs
 @0:100 annotate stop-creating-blocks
 @0:190 write_overlay_statistics
