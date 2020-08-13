@@ -11,7 +11,7 @@ from bami.backbone.utils import decode_raw, encode_raw
 from bami.payment.exceptions import InsufficientBalanceException
 
 from gumby.experiment import experiment_callback
-from gumby.modules.bami_module import BamiPaymentCommunity, DataCommunity
+from gumby.modules.bami_module import BamiPaymentCommunity, DataCommunity, DataCommunityWithDiscovery
 from gumby.modules.community_experiment_module import IPv8OverlayExperimentModule
 from gumby.modules.experiment_module import static_module
 from gumby.util import Dist, run_task
@@ -26,7 +26,11 @@ class BaseBamiExperiments(IPv8OverlayExperimentModule):
         self.start_time = None
 
         self.blob_creation_tasks = {}
+        self.meta_creation_tasks = {}
+
         self.my_groups = []
+
+        self.META_PREFIX = b'meta'
 
     def change_settings_from_environ(self):
         if os.environ.get('WITNESS_BLOCK_DELTA'):
@@ -114,35 +118,12 @@ class BaseBamiExperiments(IPv8OverlayExperimentModule):
             writer.writeheader()
         self.start_time = time()
 
-
-@static_module
-class BamiDataExperiments(BaseBamiExperiments):
-
-    def __init__(self, experiment: Any) -> None:
-        super().__init__(experiment, DataCommunity)
-
-        self.blob_creation_tasks = {}
-        self.meta_creation_tasks = {}
-
-        self.META_PREFIX = b'meta'
-
     def on_id_received(self):
         super().on_id_received()
         self.init_block_stat_file()
 
-    @experiment_callback
-    def join_group(self, peer_id: str = '1') -> None:
-        self.join_subcommunity_by_peer_id(peer_id)
-
-        com_id = b64decode(self.get_peer_public_key(peer_id))
-        self.overlay.subscribe_out_order_block(com_id, self.add_block)
-
-        # 2. Meta-data on the data blocks, process them in-order
-        meta_prefix = self.META_PREFIX
-        self.overlay.subscribe_in_order_block(meta_prefix + com_id, self.add_block)
-
-    @experiment_callback
-    def join_random_groups(self) -> None:
+    def group_forming(self) -> None:
+        """Form a group"""
         if os.environ.get('JOIN_GROUPS'):
             num_groups_dist = Dist.from_raw_str(os.environ.get('JOIN_GROUPS'))
             seed = int(os.environ.get('GROUPS_SEED'))
@@ -153,55 +134,72 @@ class BamiDataExperiments(BaseBamiExperiments):
             # Write bandwidth statistics
         else:
             self.my_groups = [1]
-        for exp_id in self.my_groups:
-            peer_id = str(exp_id)
-            # Join sub-community defined by the group
-            self.join_subcommunity_by_peer_id(peer_id)
-            com_id = b64decode(self.get_peer_public_key(peer_id))
-            self.overlay.subscribe_out_order_block(com_id, self.add_block)
 
-            # 2. Meta-data on the data blocks, process them in-order
-            meta_prefix = self.META_PREFIX
-            self.overlay.subscribe_in_order_block(meta_prefix + com_id, self.add_block)
 
-    @experiment_callback
-    def create_random_blob(self, blob_size: int, peer_id: str) -> None:
-        print('Creating random blob')
+class BaseBamiDataExperiments(BaseBamiExperiments):
+
+    def _join_group(self, peer_id: str):
+        self.join_subcommunity_by_peer_id(peer_id)
+
+        com_id = b64decode(self.get_peer_public_key(peer_id))
+        self.overlay.subscribe_out_order_block(com_id, self.add_block)
+
+        # 2. Meta-data on the data blocks, process them in-order
+        meta_prefix = self.META_PREFIX
+        self.overlay.subscribe_in_order_block(meta_prefix + com_id, self.add_block)
+
+    def _create_random_blob(self, blob_size: int, peer_id: str) -> None:
         blob = encode_raw(b'0' * int(blob_size))
         com_id = b64decode(self.get_peer_public_key(peer_id))
         self.overlay.push_data_blob(blob, com_id)
 
-    @experiment_callback
-    def start_creating_blobs(self, interval: float = 1, blob_size: int = 300) -> None:
-        print('Start creating blobs')
+    def _start_creating_blobs(self, interval: str = '1', blob_size: str = '300'):
         if os.environ.get('NUM_PRODUCERS'):
             num_producers = int(os.environ.get('NUM_PRODUCERS'))
         else:
             num_producers = -1
-        print('Number of blob producers:', num_producers)
         if os.environ.get('BLOCK_INTERVAL'):
             interval = Dist.from_raw_str(os.environ.get('BLOCK_INTERVAL'))
         else:
             interval = Dist.from_raw_str(str(interval))
-        print('Block interval is:', interval.get())
         if os.environ.get('BLOCK_DELAY'):
             delay = Dist.from_raw_str(os.environ.get('BLOCK_DELAY'))
         else:
             delay = Dist.from_raw_str('uniform,(1,1)')
-        print('Block delay is:', delay.get())
         if num_producers < 0 or self.my_id <= num_producers:
-            print('Im a producer. My groups', self.my_groups)
+            print('Im a producer of blocks, interval: ', str(interval), ' on groups', self.my_groups)
             for peer_id in self.my_groups:
-                self.blob_creation_tasks[str(peer_id)] = run_task(self.create_random_blob,
-                                                                  blob_size,
+                self.blob_creation_tasks[str(peer_id)] = run_task(self._create_random_blob,
+                                                                  int(blob_size),
                                                                   str(peer_id),
                                                                   interval=interval.get(),
                                                                   delay=delay.get())
 
-    @experiment_callback
-    def stop_creating_blobs(self):
+    def _stop_creating_blobs(self):
         for task in self.blob_creation_tasks.values():
             task.cancel()
+
+    @experiment_callback
+    def join_group(self, peer_id: str = '1') -> None:
+        self._join_group(peer_id)
+
+    @experiment_callback
+    def join_random_groups(self) -> None:
+        self.group_forming()
+        for exp_id in self.my_groups:
+            self._join_group(str(exp_id))
+
+    @experiment_callback
+    def create_random_blob(self, blob_size: int, peer_id: str) -> None:
+        self._create_random_blob(blob_size, peer_id)
+
+    @experiment_callback
+    def start_creating_blobs(self, interval: str = '1', blob_size: str = '300') -> None:
+        self._start_creating_blobs(interval, blob_size)
+
+    @experiment_callback
+    def stop_creating_blobs(self):
+        self._stop_creating_blobs()
 
     @experiment_callback
     def create_random_meta_block(self, peer_id: str) -> None:
@@ -230,13 +228,23 @@ class BamiDataExperiments(BaseBamiExperiments):
 
 
 @static_module
+class BamiDataExperiments(BaseBamiDataExperiments):
+
+    def __init__(self, experiment: Any) -> None:
+        super().__init__(experiment, DataCommunity)
+
+
+@static_module
+class BamiDataWithDiscoveryExperiments(BaseBamiDataExperiments):
+
+    def __init__(self, experiment: Any) -> None:
+        super().__init__(experiment, DataCommunityWithDiscovery)
+
+
+@static_module
 class BamiPaymentExperiments(BaseBamiExperiments):
     def __init__(self, experiment):
         super().__init__(experiment, BamiPaymentCommunity)
-
-    def on_id_received(self):
-        super().on_id_received()
-        self.init_block_stat_file()
 
     @experiment_callback
     def join_random_groups(self) -> None:

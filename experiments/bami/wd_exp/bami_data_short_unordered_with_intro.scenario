@@ -1,5 +1,5 @@
 &module gumby.modules.anydex_module.AnyDexModule
-&module experiments.bami.bami_module.BamiDataExperiments
+&module experiments.bami.bami_module.BamiDataWithDiscoveryExperiments
 
 @0:1 isolate_ipv8_overlay DataCommunityWithDiscovery
 @0:1 enable_bami_data_wd

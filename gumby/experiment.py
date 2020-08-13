@@ -219,8 +219,14 @@ class ExperimentClient(LineReceiver):
         # We have to be careful not to getattr on members that are @property decorated. Besides them not being
         # callbacks anyways, they trigger the python descriptors that invoke the @property magic. We would invoke the
         # getter. So we filter the contents of our target.
-        member_names = [name for name in dir(target) if type(getattr(target.__class__, name, None)).__name__ !=
-                        "property"]
+        member_names = set()
+        for subclass in target.__class__.mro():
+            for name in dir(subclass):
+                if name not in member_names and type(getattr(subclass, name, None)).__name__ != "property":
+                    member_names.add(name)
+
+        #member_names = [name for name in dir(target) if type(getattr(target.__class__, name, None)).__name__ !=
+        #                "property"]
         for member in [getattr(target, key) for key in member_names]:
             if not (callable(member) and hasattr(member, "register_as_callback")):
                 continue
