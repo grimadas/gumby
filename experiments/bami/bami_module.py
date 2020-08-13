@@ -162,25 +162,31 @@ class BamiDataExperiments(BaseBamiExperiments):
 
     @experiment_callback
     def create_random_blob(self, blob_size: int, peer_id: str) -> None:
+        print('Creating random blob')
         blob = encode_raw(b'0' * int(blob_size))
         com_id = b64decode(self.get_peer_public_key(peer_id))
         self.overlay.push_data_blob(blob, com_id)
 
     @experiment_callback
     def start_creating_blobs(self, interval: float = 1, blob_size: int = 300) -> None:
+        print('Start creating blobs')
         if os.environ.get('NUM_PRODUCERS'):
             num_producers = int(os.environ.get('NUM_PRODUCERS'))
         else:
             num_producers = -1
+        print('Number of blob producers:', num_producers)
         if os.environ.get('BLOCK_INTERVAL'):
             interval = Dist.from_raw_str(os.environ.get('BLOCK_INTERVAL'))
         else:
             interval = Dist.from_raw_str(str(interval))
+        print('Block interval is:', interval.get())
         if os.environ.get('BLOCK_DELAY'):
             delay = Dist.from_raw_str(os.environ.get('BLOCK_DELAY'))
         else:
             delay = Dist.from_raw_str('uniform,(1,1)')
+        print('Block delay is:', delay.get())
         if num_producers < 0 or self.my_id <= num_producers:
+            print('Im a producer. My groups', self.my_groups)
             for peer_id in self.my_groups:
                 self.blob_creation_tasks[str(peer_id)] = run_task(self.create_random_blob,
                                                                   blob_size,
