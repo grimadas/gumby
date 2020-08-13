@@ -169,11 +169,13 @@ class BaseBamiDataExperiments(BaseBamiExperiments):
         if num_producers < 0 or self.my_id <= num_producers:
             print('Im a producer of blocks, interval: ', str(interval), ' on groups', self.my_groups)
             for peer_id in self.my_groups:
-                self.blob_creation_tasks[str(peer_id)] = run_task(self._create_random_blob,
-                                                                  int(blob_size),
-                                                                  str(peer_id),
-                                                                  interval=interval.get(),
-                                                                  delay=delay.get())
+                self.blob_creation_tasks[str(peer_id)] = self.overlay.register_task('blob_create' + str(peer_id),
+                                                                                    self._create_random_blob,
+                                                                                    int(blob_size),
+                                                                                    str(peer_id),
+                                                                                    interval=interval.get(),
+                                                                                    delay=delay.get()
+                                                                                    )
 
     def _stop_creating_blobs(self):
         for task in self.blob_creation_tasks.values():
