@@ -132,7 +132,7 @@ class BaseBamiExperiments(IPv8OverlayExperimentModule):
             n = len(self.all_vars.keys())
             nums = num_groups_dist.generate(n, seed=seed)
 
-            self.my_groups = [i % n for i in range(1, nums[int(self.my_id) - 1] + 1)] if int(self.my_id) else []
+            self.my_groups = [i % n for i in range(1, int(nums[int(self.my_id) - 1]) + 1)] if int(self.my_id) else []
             print('joining ', len(self.my_groups), ' groups')
             # Write bandwidth statistics
         else:

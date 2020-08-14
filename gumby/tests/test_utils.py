@@ -36,9 +36,3 @@ class TestStatisticsParser(unittest.TestCase):
         d = Dist.from_raw_str('planck,(0.34,1)')
         val1 = d.generate(n=100, seed=10)
         print(val1)
-
-
-
-
-
-
