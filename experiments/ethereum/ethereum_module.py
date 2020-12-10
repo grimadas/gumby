@@ -37,6 +37,7 @@ class EthereumModule(BlockchainModule):
         self.tx_pool_lc = None
         self.submitted_transactions = {}
         self.confirmed_transactions = {}
+        self.enode_info = None
 
     def on_message(self, from_id, msg_type, msg):
         self._logger.info("Received message with type %s from peer %d", msg_type, from_id)
@@ -46,6 +47,8 @@ class EthereumModule(BlockchainModule):
             self.deployed_contract_abi = json.loads(unhexlify(msg).decode())
         elif msg_type == b"public_key":
             self.others_public_keys[from_id] = msg.decode()
+        elif msg_type == b"enode_info":
+            self.enode_info = unhexlify(msg).decode()
 
     @experiment_callback
     def generate_keypair(self):
@@ -58,7 +61,7 @@ class EthereumModule(BlockchainModule):
         with open("password.txt", "w") as password_file:
             password_file.write("password")
 
-        cmd = "geth account new --datadir data --password password.txt"
+        cmd = "%s account new --datadir data --password password.txt" % os.path.join(os.environ["HOME"], "geth_bin", "geth")
         process = subprocess.Popen([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         process.wait()
 
@@ -82,26 +85,13 @@ class EthereumModule(BlockchainModule):
                 self.experiment.send_message(client_index, b"public_key", self.public_key.encode())
 
     @experiment_callback
-    def connect_to_nodes(self):
-        self._logger.info("Connecting to bootstrap node...")
-
-        all_peer_ids = list(self.all_vars.keys())
-        peer_ids = random.sample(all_peer_ids, min(len(all_peer_ids), 50))
-
-        url = 'http://localhost:%d' % (14000 + self.experiment.my_id)
-        w3 = Web3(Web3.HTTPProvider(url))
-
-        for peer_id in peer_ids:
-            self._logger.info("Connecting to peer %s", peer_id)
-            with open("/home/pouwelse/ethash/ethereum_node_%s" % peer_id, "r") as bootstrap_node_file:
-                bootstrap_enode = json.loads(bootstrap_node_file.read())["enode"]
-                w3.geth.admin.add_peer(bootstrap_enode)
-
-    @experiment_callback
     def generate_genesis(self):
         """
         Generate the initial genesis file.
         """
+        if not self.is_responsible_validator():
+            return
+
         self._logger.info("Generating Ethereum genesis file...")
 
         alloc_json = {}
@@ -111,8 +101,7 @@ class EthereumModule(BlockchainModule):
         if "MINING_DIFFICULTY" in os.environ:
             difficulty = str(os.environ["MINING_DIFFICULTY"])
         else:
-            # This number is based on the DAS5 CPUs, with an average block time of 13 seconds.
-            difficulty = "%d" % (55000 * 13 * self.num_validators)
+            difficulty = "%d" % (30000 * 13 * self.num_validators)
 
         if "GAS_LIMIT" in os.environ:
             gas_limit = str(os.environ["GAS_LIMIT"])
@@ -138,7 +127,7 @@ class EthereumModule(BlockchainModule):
             "alloc": alloc_json
         }
 
-        with open("/home/pouwelse/genesis.json", "w") as genesis_json_file:
+        with open(os.path.join(os.environ["HOME"], "genesis.json"), "w") as genesis_json_file:
             genesis_json_file.write(json.dumps(genesis_json))
 
     @experiment_callback
@@ -151,9 +140,9 @@ class EthereumModule(BlockchainModule):
 
         self._logger.info("Initializing blockchain data dir...")
 
-        copyfile("/home/pouwelse/genesis.json", "genesis.json")
+        copyfile(os.path.join(os.environ["HOME"], "genesis.json"), "genesis.json")
 
-        cmd = "geth init --datadir data genesis.json"
+        cmd = "%s init --datadir data genesis.json" % os.path.join(os.environ["HOME"], "geth_bin", "geth")
         process = subprocess.Popen([cmd], shell=True)
         process.wait()
 
@@ -170,28 +159,29 @@ class EthereumModule(BlockchainModule):
         port = 12000 + self.experiment.my_id
         rpc_port = 14000 + self.experiment.my_id
         pprof_port = 16000 + self.experiment.my_id
+        ethash_dir = os.path.join(os.environ["HOME"], "ethash")
+        geth_bin_path = os.path.join(os.environ["HOME"], "geth_bin", "geth")
 
         host, _ = self.experiment.get_peer_ip_port_by_id(str(self.experiment.my_id))
         if self.experiment.my_id == 1:
-            cmd = "geth --datadir data --allow-insecure-unlock --metrics --pprof --pprofport %d --rpc --rpcport %d " \
+            cmd = "%s --datadir data --allow-insecure-unlock --metrics --pprof --pprofport %d --rpc --rpcport %d " \
                   "--rpcaddr 0.0.0.0 " \
-                  "--rpcapi=\"eth,net,web3,personal,admin,debug,txpool\" --ethash.dagdir /home/pouwelse/ethash " \
+                  "--rpcapi=\"eth,net,web3,personal,admin,debug,txpool\" --ethash.dagdir %s " \
                   "--port %d --networkid %d --nat extip:%s --mine --miner.threads=1 --maxpeers 500 " \
-                  "--netrestrict 10.141.0.0/24 --txpool.globalslots=20000 " \
-                  "--txpool.globalqueue=20000 > ethereum.out 2>&1" % (pprof_port, rpc_port, port, self.network_id, host)
+                  "--netrestrict 192.42.116.0/24 --txpool.globalslots=20000 " \
+                  "--txpool.globalqueue=20000 > ethereum.out 2>&1" % \
+                  (geth_bin_path, pprof_port, rpc_port, ethash_dir, port, self.network_id, host)
         else:
             start_delay = random.random() * 10
             await sleep(start_delay)
 
-            with open("/home/pouwelse/ethash/ethereum_node_1", "r") as bootstrap_node_file:
-                bootstrap_enode = json.loads(bootstrap_node_file.read())["enode"]
-            cmd = "geth --datadir data --allow-insecure-unlock --metrics --pprof --pprofport %d --rpc --rpcport %d " \
+            cmd = "%s --datadir data --allow-insecure-unlock --metrics --pprof --pprofport %d --rpc --rpcport %d " \
                   "--rpcaddr 0.0.0.0 " \
-                  "--rpcapi=\"eth,net,web3,personal,admin,debug,txpool\" --ethash.dagdir /home/pouwelse/ethash " \
+                  "--rpcapi=\"eth,net,web3,personal,admin,debug,txpool\" --ethash.dagdir %s " \
                   "--port %d --networkid %d --nat extip:%s --mine --miner.threads=1 --maxpeers 500 " \
-                  "--netrestrict 10.141.0.0/24 --txpool.globalslots=20000 --txpool.globalqueue=20000 " \
+                  "--netrestrict 192.42.116.0/24 --txpool.globalslots=20000 --txpool.globalqueue=20000 " \
                   "--bootnodes %s > ethereum.out 2>&1" \
-                  % (pprof_port, rpc_port, port, self.network_id, host, bootstrap_enode)
+                  % (geth_bin_path, pprof_port, rpc_port, ethash_dir, port, self.network_id, host, self.enode_info)
 
         self._logger.info("Ethereum start command: %s", cmd)
 
@@ -234,17 +224,17 @@ class EthereumModule(BlockchainModule):
         self._logger.info("Account unlocked!")
 
     @experiment_callback
-    def write_node_info(self):
+    def broadcast_node_info(self):
         """
-        Write node connection info.
+        Broadcast node connection info.
         """
-        self._logger.info("Writing node info...")
+        self._logger.info("Broadcasting node info...")
         url = 'http://localhost:%d' % (14000 + self.experiment.my_id)
         w3 = Web3(Web3.HTTPProvider(url))
-        node_info = w3.geth.admin.node_info()
+        enode_info = w3.geth.admin.node_info()["enode"].encode()
 
-        with open("/home/pouwelse/ethash/ethereum_node_%d" % self.experiment.my_id, "w") as out_file:
-            out_file.write(w3.toJSON(node_info))
+        for validator_index in range(1, self.num_validators + 1):
+            self.experiment.send_message(validator_index, b"enode_info", hexlify(enode_info))
 
     @experiment_callback
     def print_connected_peers(self):
@@ -403,10 +393,9 @@ class EthereumModule(BlockchainModule):
 
     @experiment_callback
     def stop_ethereum(self):
-        self._logger.info("Stopping Ethereum...")
-
         if self.ethereum_process:
-            self.ethereum_process.kill()
+            self._logger.info("Stopping Ethereum...")
+            self.ethereum_process.terminate()
 
         loop = get_event_loop()
         loop.stop()
