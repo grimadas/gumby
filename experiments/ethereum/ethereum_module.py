@@ -49,6 +49,10 @@ class EthereumModule(BlockchainModule):
             self.others_public_keys[from_id] = msg.decode()
         elif msg_type == b"enode_info":
             self.enode_info = unhexlify(msg).decode()
+        elif msg_type == b"genesis":
+            if self.is_responsible_validator():
+                with open(os.path.join(os.environ["HOME"], "genesis.json"), "w") as genesis_json_file:
+                    genesis_json_file.write(unhexlify(msg).decode())
 
     @experiment_callback
     def generate_keypair(self):
@@ -126,6 +130,10 @@ class EthereumModule(BlockchainModule):
             "gasLimit": gas_limit,
             "alloc": alloc_json
         }
+
+        encoded_genesis = hexlify(json.dumps(genesis_json).encode())
+        for validator_index in range(2, self.num_validators + 1):
+            self.experiment.send_message(validator_index, b"genesis", encoded_genesis)
 
         with open(os.path.join(os.environ["HOME"], "genesis.json"), "w") as genesis_json_file:
             genesis_json_file.write(json.dumps(genesis_json))

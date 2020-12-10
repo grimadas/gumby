@@ -4,7 +4,7 @@
 &module experiments.ethereum.erc20_module.ERC20Module
 
 @0:1 generate_keypair
-@0:6 generate_genesis
+@0:6 generate_genesis {1}
 @0:8 initialize_chain
 @0:10 start_ethereum {1}
 @0:14 broadcast_node_info {1}
