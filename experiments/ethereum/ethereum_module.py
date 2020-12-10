@@ -403,7 +403,7 @@ class EthereumModule(BlockchainModule):
     def stop_ethereum(self):
         if self.ethereum_process:
             self._logger.info("Stopping Ethereum...")
-            self.ethereum_process.terminate()
+            self.kill_process(self.ethereum_process.pid)
 
         loop = get_event_loop()
         loop.stop()

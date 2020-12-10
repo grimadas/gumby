@@ -1,5 +1,7 @@
 import os
 
+import psutil
+
 from gumby.modules.experiment_module import static_module, ExperimentModule
 from gumby.modules.transactions_module import TransactionsModule
 
@@ -44,3 +46,9 @@ class BlockchainModule(ExperimentModule):
             if isinstance(module, TransactionsModule):
                 self._logger.info("Found transaction manager!")
                 self.transactions_manager = module
+
+    def kill_process(self, proc_pid):
+        process = psutil.Process(proc_pid)
+        for proc in process.children(recursive=True):
+            proc.kill()
+        process.kill()
