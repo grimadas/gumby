@@ -25,7 +25,7 @@ class HyperledgerModule(BlockchainModule):
 
     def __init__(self, experiment):
         super(HyperledgerModule, self).__init__(experiment)
-        self.config_path = "/home/pouwelse/hyperledger-network-template"
+        self.config_path = "/home/martijn/hyperledger-deploy-scripts"
         self.fabric_client = None
         self.peer_process = None
         self.orderer_process = None
@@ -227,7 +227,7 @@ class HyperledgerModule(BlockchainModule):
         orderer_env.update(orderer_vars)
 
         # Start the orderer
-        cmd = "orderer > orderer.out 2>&1"
+        cmd = "/home/martijn/hyperledger/orderer > orderer.out 2>&1"
         self.orderer_process = subprocess.Popen([cmd], shell=True, env=orderer_env)
 
     @experiment_callback
@@ -272,7 +272,7 @@ class HyperledgerModule(BlockchainModule):
         peer_env.update(peer_vars)
 
         # Start the peer
-        cmd = "peer node start > peer.out 2>&1"
+        cmd = "/home/martijn/hyperledger/peer node start > peer.out 2>&1"
         self.peer_process = subprocess.Popen([cmd], shell=True, env=peer_env)
 
     @experiment_callback
@@ -348,17 +348,23 @@ class HyperledgerModule(BlockchainModule):
             network_file.write(json.dumps(network_config))
 
     @experiment_callback
-    def generate_artifacts(self):
-        self._logger.info("Generating artifacts...")
-        os.system("/home/pouwelse/hyperledger-network-template/generate.sh")
+    def share_config_with_other_nodes(self):
+        """
+        Rsync the generated config to other nodes.
+        """
+        my_host, _ = self.experiment.get_peer_ip_port_by_id(self.experiment.my_id)
+        other_hosts = set()
+        for peer_id in self.experiment.all_vars.keys():
+            host = self.experiment.all_vars[peer_id]['host']
+            if host not in other_hosts and host != my_host:
+                other_hosts.add(host)
+                self._logger.info("Syncing config with host %s", host)
+                os.system("rsync -r /home/martijn/hyperledger-deploy-scripts martijn@%s:/home/martijn/" % host)
 
     @experiment_callback
-    def start_network(self):
-        if self.is_client():
-            return
-
-        self._logger.info("Starting network...")
-        os.system("/home/pouwelse/hyperledger-network-template/start_containers.sh %d" % self.my_id)
+    def generate_artifacts(self):
+        self._logger.info("Generating artifacts...")
+        os.system(os.path.join(self.config_path, "generate.sh"))
 
     @experiment_callback
     async def deploy_chaincode(self):
@@ -419,14 +425,6 @@ class HyperledgerModule(BlockchainModule):
             wait_for_event=True  # optional, for being sure chaincode is instantiated
         )
         self._logger.info("Result of chaincode instantiation: %s", response)
-
-    @experiment_callback
-    def stop_network(self):
-        if self.is_client():
-            return
-
-        self._logger.info("Stopping network...")
-        os.system("/home/pouwelse/hyperledger-network-template/stop_all.sh")
 
     @experiment_callback
     async def start_monitor(self):

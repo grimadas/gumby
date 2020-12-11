@@ -4,6 +4,7 @@
 
 @0:1 generate_config {1}
 @0:3 generate_artifacts {1}
+@0:7 share_config_with_other_nodes {1}
 @0:10 init_config
 @0:10 generate_client_config
 @0:15 start_orderers
