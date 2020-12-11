@@ -35,7 +35,7 @@ class BitsharesModule(BlockchainModule):
         self.create_ask = True
         self.orders_info = []  # Keeps track of tuples: (order_creation_time, signature)
         self.tx_info = []
-        self.devnet_dir = "/home/pouwelse/bitshares-core/devnet"
+        self.devnet_dir = "/tmp/bitshares"
 
         self.order_id_map = {}
         self.cancelled_orders = set()
@@ -314,7 +314,7 @@ class BitsharesModule(BlockchainModule):
 
     @experiment_callback
     def stop(self):
-        print("Stopping...")
+        print("Stopping BitShares...")
         if self.bs_process:
             self.bs_process.kill()
         if self.dump_blockchain_lc:
@@ -322,4 +322,3 @@ class BitsharesModule(BlockchainModule):
 
         loop = get_event_loop()
         loop.stop()
-        sys.exit(0)
