@@ -28,4 +28,4 @@ mkdir -p $VENV/src
 
 source $VENV/bin/activate
 
-python -m pip install psutil py-solc-x web3
+python -m pip install psutil py-algorand-sdk py-solc-x web3

@@ -25,7 +25,6 @@ class AlgorandModule(BlockchainModule):
 
     def __init__(self, experiment):
         super(AlgorandModule, self).__init__(experiment)
-        self.root_dir = os.path.join(os.environ["WORKSPACE"], "algo_data")
         self.node_process = None
         self.kmd_process = None
         self.algod_client = None
@@ -43,64 +42,6 @@ class AlgorandModule(BlockchainModule):
     def on_all_vars_received(self):
         super(AlgorandModule, self).on_all_vars_received()
         self.transactions_manager.transfer = self.transfer
-
-    @experiment_callback
-    def create_network(self):
-        """
-        Create the root directory with network information.
-        """
-        self._logger.info("Starting to create network info...")
-
-        # Step 1: Generate genesis.json, depending on the number of nodes
-        genesis = {
-            "Genesis": {
-                "NetworkName": "",
-                "Wallets": [
-                    # This is filled in
-                ]
-            },
-            "Nodes": [
-                # This is filled in
-            ]
-        }
-
-        stake_per_node = 100 // self.num_validators
-        last_node_stake = stake_per_node + 100 - (stake_per_node * self.num_validators)
-
-        for node_ind in range(self.num_validators):
-            wallet_name = "Wallet%d" % (node_ind + 1)
-            stake = stake_per_node if node_ind != (self.num_validators - 1) else last_node_stake
-
-            wallet_info = {
-                "Name": wallet_name,
-                "Stake": stake,
-                "Online": True
-            }
-            genesis["Genesis"]["Wallets"].append(wallet_info)
-
-            node_info = {
-                "Name": "Node%d" % (node_ind + 1),
-                "IsRelay": node_ind == 0,
-                "Wallets": [{
-                    "Name": wallet_name,
-                    "ParticipationOnly": False
-                }]
-            }
-            genesis["Nodes"].append(node_info)
-
-        with open("genesis.json", "w") as genesis_file:
-            genesis_file.write(json.dumps(genesis))
-
-        # Step 2: Create the network/configuration files
-        cmd = "/home/pouwelse/gocode/bin/goal network create -r %s -n private -t genesis.json > create.out" \
-              % self.root_dir
-        os.system(cmd)
-
-        # Kill the kmd processes
-        cmd = 'pkill -f "kmd-v0.5"'
-        os.system(cmd)
-
-        self._logger.info("Done with making network info!")
 
     def get_data_dir(self, peer_id):
         return os.path.join(os.getcwd(), "Node%d" % peer_id)
@@ -122,7 +63,7 @@ class AlgorandModule(BlockchainModule):
             return
 
         # Copy over the configuration to the local file system
-        config_dir = "/home/pouwelse/algorand_data/data-%d" % self.num_validators
+        config_dir = "/tmp/algo_data_%d" % self.num_validators
         shutil.copytree(os.path.join(config_dir, "Node%d" % self.my_id), "Node%d" % self.my_id)
 
         self._logger.info("Initializing configuration...")
@@ -167,13 +108,12 @@ class AlgorandModule(BlockchainModule):
         if self.is_client():
             return
 
-        self._logger.info("Starting Algorand node...")
         if self.my_id == 1:
-            cmd = "/home/pouwelse/gocode/bin/goal node start -d %s" % self.get_data_dir(self.my_id)
+            cmd = "goal node start -d %s" % self.get_data_dir(self.my_id)
         else:
             ip, _ = self.experiment.get_peer_ip_port_by_id(1)
             peer_str = "%s:13001" % ip
-            cmd = "/home/pouwelse/gocode/bin/goal node start -d %s -p %s" % (self.get_data_dir(self.my_id), peer_str)
+            cmd = "goal node start -d %s -p %s" % (self.get_data_dir(self.my_id), peer_str)
 
         # Wait a bit, depending on the node number
         await sleep((self.my_id - 1) * 0.5)
@@ -181,7 +121,7 @@ class AlgorandModule(BlockchainModule):
         self._logger.info("Starting Algorand node...")
         self.node_process = subprocess.Popen([cmd], shell=True)
 
-        kmd_cmd = "/home/pouwelse/gocode/bin/goal kmd start -d %s" % self.get_data_dir(self.my_id)
+        kmd_cmd = "goal kmd start -d %s" % self.get_data_dir(self.my_id)
         self.kmd_process = subprocess.Popen([kmd_cmd], shell=True)
 
     @experiment_callback
