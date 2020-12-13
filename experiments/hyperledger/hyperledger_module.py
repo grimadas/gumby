@@ -359,7 +359,7 @@ class HyperledgerModule(BlockchainModule):
             if host not in other_hosts and host != my_host:
                 other_hosts.add(host)
                 self._logger.info("Syncing config with host %s", host)
-                os.system("rsync -r /home/martijn/hyperledger-deploy-scripts martijn@%s:/home/martijn/" % host)
+                os.system("rsync -r --delete /home/martijn/hyperledger-deploy-scripts martijn@%s:/home/martijn/" % host)
 
     @experiment_callback
     def generate_artifacts(self):
@@ -435,13 +435,13 @@ class HyperledgerModule(BlockchainModule):
         org1_admin = self.fabric_client.get_user(org_name='org1.example.com', name='Admin')
 
         self._logger.info("Starting monitor...")
-        cmd = "cd /home/pouwelse/fabric-examples/fabric-cli/cmd/fabric-cli/ && /home/pouwelse/go/bin/go run " \
-              "/home/pouwelse/fabric-examples/fabric-cli/cmd/fabric-cli/fabric-cli.go event listenblock " \
+        cmd = "cd /home/martijn/fabric-examples/fabric-cli/cmd/fabric-cli/ && /home/martijn/go/bin/go run " \
+              "/home/martijn/fabric-examples/fabric-cli/cmd/fabric-cli/fabric-cli.go event listenblock " \
               "--cid mychannel --peer localhost:8001 " \
-              "--config /home/pouwelse/fabric-examples/fabric-cli/cmd/fabric-cli/config.yaml > %s" \
+              "--config /home/martijn/fabric-examples/fabric-cli/cmd/fabric-cli/config.yaml > %s" \
               % os.path.join(os.getcwd(), "transactions.txt")
         my_env = os.environ.copy()
-        my_env["GOPATH"] = "/home/pouwelse/gocode"
+        my_env["GOPATH"] = "/home/martijn/gocode"
         self.monitor_process = subprocess.Popen(cmd, env=my_env, shell=True)
 
         async def get_latest_block_num():
@@ -524,7 +524,7 @@ class HyperledgerModule(BlockchainModule):
 
         # Make a transaction
         args = ["blah", "20"]
-        admin = self.fabric_client.get_user(org_name='org1.example.com', name='Admin')
+        admin = self.fabric_client.get_user(org_name='org%d.example.com' % validator_peer_id, name='Admin')
         ensure_future(self.fabric_client.chaincode_invoke(
             requestor=admin,
             channel_name='mychannel',
