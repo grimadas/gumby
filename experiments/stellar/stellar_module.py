@@ -1,7 +1,8 @@
 import os
+import shutil
+
 import requests
 import subprocess
-import sys
 import time
 from asyncio import get_event_loop
 from threading import Thread
@@ -9,8 +10,6 @@ from threading import Thread
 from urllib.parse import quote_plus
 
 from datetime import datetime
-
-import treq
 
 from stellar_base import Keypair, Horizon
 from stellar_base.builder import Builder
@@ -46,9 +45,6 @@ class StellarModule(BlockchainModule):
         self.current_tx_num = 0
         self.tx_submit_times = {}
 
-        # Make sure our postgres can be found
-        sys.path.append("/home/pouwelse/postgres/bin")
-
     def on_all_vars_received(self):
         super(StellarModule, self).on_all_vars_received()
         self.transactions_manager.transfer = self.transfer
@@ -73,10 +69,11 @@ class StellarModule(BlockchainModule):
 
         ip, _ = self.experiment.get_peer_ip_port_by_id(self.my_id)
 
-        self.db_path = os.path.join(os.environ["WORKSPACE"], "postgres", ip)
-        os.makedirs(self.db_path)
+        self.db_path = os.path.join("/tmp", "postgres-data", ip)
+        shutil.rmtree(self.db_path, ignore_errors=True)
+        os.makedirs(self.db_path, exist_ok=True)
 
-        os.system("/home/pouwelse/postgres/bin/initdb %s" % self.db_path)
+        os.system("/usr/lib/postgresql/11/bin/initdb %s" % self.db_path)
 
     @experiment_callback
     def start_db(self):
@@ -84,7 +81,7 @@ class StellarModule(BlockchainModule):
             return
 
         os.environ["PGDATA"] = self.db_path
-        cmd = "/home/pouwelse/postgres/bin/pg_ctl start"
+        cmd = "/usr/lib/postgresql/11/bin/pg_ctl start"
         self.postgres_process = subprocess.Popen([cmd], shell=True)
 
     @experiment_callback
@@ -94,10 +91,10 @@ class StellarModule(BlockchainModule):
 
         # Create users and table
         cmd = "CREATE USER tribler WITH PASSWORD 'tribler';"
-        os.system('/home/pouwelse/postgres/bin/psql postgres -c "%s"' % cmd)
+        os.system('/usr/lib/postgresql/11/bin/psql postgres -c "%s"' % cmd)
 
         cmd = "ALTER USER tribler WITH SUPERUSER;"
-        os.system('/home/pouwelse/postgres/bin/psql postgres -c "%s"' % cmd)
+        os.system('/usr/lib/postgresql/11/bin/psql postgres -c "%s"' % cmd)
 
     @experiment_callback
     def create_db(self):
@@ -105,16 +102,16 @@ class StellarModule(BlockchainModule):
             return
 
         cmd = "CREATE DATABASE stellar_%d_db;" % self.my_id
-        os.system('/home/pouwelse/postgres/bin/psql postgres -c "%s"' % cmd)
+        os.system('/usr/lib/postgresql/11/bin/psql postgres -c "%s"' % cmd)
 
         cmd = "GRANT ALL PRIVILEGES ON DATABASE stellar_%d_db TO tribler;" % self.my_id
-        os.system('/home/pouwelse/postgres/bin/psql postgres -c "%s"' % cmd)
+        os.system('/usr/lib/postgresql/11/bin/psql postgres -c "%s"' % cmd)
 
         cmd = "CREATE DATABASE stellar_horizon_%d_db;" % self.my_id
-        os.system('/home/pouwelse/postgres/bin/psql postgres -c "%s"' % cmd)
+        os.system('/usr/lib/postgresql/11/bin/psql postgres -c "%s"' % cmd)
 
         cmd = "GRANT ALL PRIVILEGES ON DATABASE stellar_horizon_%d_db TO tribler;" % self.my_id
-        os.system('/home/pouwelse/postgres/bin/psql postgres -c "%s"' % cmd)
+        os.system('/usr/lib/postgresql/11/bin/psql postgres -c "%s"' % cmd)
 
     @experiment_callback
     def init_config(self):
@@ -128,7 +125,7 @@ class StellarModule(BlockchainModule):
 
         # Read the keys
         keys = []
-        with open("/home/pouwelse/stellar-core/keys.txt", "r") as keys_file:
+        with open("/home/martijn/stellar-core/keys.txt", "r") as keys_file:
             for line in keys_file.readlines():
                 line = line.strip()
                 seed, pub_key = line.split(" ")
@@ -148,7 +145,7 @@ ADDRESS="%s:%d"
 
 """ % (validator_index + 1, keys[validator_index][1], validator_host, 14000 + validator_index + 1)
 
-        with open("/home/pouwelse/stellar-core/stellar-core-template.cfg", "r") as template_file:
+        with open("/home/martijn/stellar-core/stellar-core-template.cfg", "r") as template_file:
             template_content = template_file.read()
 
         template_content = template_content.replace("<HTTP_PORT>", str(11000 + self.my_id))
@@ -169,11 +166,15 @@ ADDRESS="%s:%d"
         if self.is_client():
             return
 
-        cmd = "/home/pouwelse/stellar-core/stellar-core new-db"
+        cmd = "/home/martijn/stellar-core/stellar-core new-db"
         os.system(cmd)  # Blocking execution
 
-        cmd = "/home/pouwelse/stellar-core/stellar-core force-scp"
+        cmd = "/home/martijn/stellar-core/stellar-core force-scp"
         os.system(cmd)  # Blocking execution
+
+        # Publish history
+        self._logger.info("Publish a new history...")
+        os.system("/home/martijn/stellar-core/stellar-core new-hist vs --conf=stellar-core.cfg")
 
     @experiment_callback
     def start_validators(self):
@@ -183,7 +184,7 @@ ADDRESS="%s:%d"
         if self.is_client():
             return
 
-        cmd = "/home/pouwelse/stellar-core/stellar-core run 2>&1"
+        cmd = "/home/martijn/stellar-core/stellar-core run 2>&1"
         self.validator_process = subprocess.Popen([cmd], shell=True, stdout=subprocess.DEVNULL)
 
     @experiment_callback
@@ -194,18 +195,20 @@ ADDRESS="%s:%d"
         if self.is_client():
             return
 
+        self._logger.info("Starting Horizon...")
+
         db_name = "stellar_%d_db" % self.my_id
         horizon_db_name = "stellar_horizon_%d_db" % self.my_id
-        cmd = '/home/pouwelse/horizon/horizon --port %d ' \
+        cmd = '/home/martijn/gocode/bin/horizon --port %d ' \
               '--ingest ' \
               '--db-url "postgresql://tribler:tribler@localhost:5432/%s?sslmode=disable" ' \
               '--stellar-core-db-url "postgresql://tribler:tribler@localhost:5432/%s?sslmode=disable" ' \
               '--stellar-core-url "http://127.0.0.1:%d" ' \
               '--network-passphrase="Standalone Pramati Network ; Oct 2018" ' \
-              '--apply-migrations > horizon.out ' \
-              '--ingest-failed-transactions=true ' \
+              '--apply-migrations ' \
               '--log-level=info ' \
-              '--per-hour-rate-limit 0 2>&1' % (19000 + self.my_id, horizon_db_name, db_name, 11000 + self.my_id)
+              '--history-archive-urls "file:///tmp/stellar-core/history/vs" ' \
+              '--per-hour-rate-limit 0 > horizon.out 2>&1' % (19000 + self.my_id, horizon_db_name, db_name, 11000 + self.my_id)
 
         self.horizon_process = subprocess.Popen([cmd], shell=True)
 
@@ -408,7 +411,7 @@ ADDRESS="%s:%d"
 
     @experiment_callback
     def stop(self):
-        print("Stopping Stellar...")
+        self._logger.info("Stopping Stellar...")
         if self.postgres_process:
             self._logger.info("Killing postgres")
             self.postgres_process.kill()
