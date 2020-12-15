@@ -94,6 +94,7 @@ def loadConfig(file_path):
             revalidate = True
     if revalidate:
         config.validate(validator)
+    config.write()
     return config
 
 
