@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import signal
 import subprocess
 import time
 from asyncio import get_event_loop, sleep, ensure_future
@@ -193,7 +194,7 @@ class EthereumModule(BlockchainModule):
 
         self._logger.info("Ethereum start command: %s", cmd)
 
-        self.ethereum_process = subprocess.Popen([cmd], shell=True)
+        self.ethereum_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
         self._logger.info("Ethereum started...")
 
     @experiment_callback
@@ -403,7 +404,7 @@ class EthereumModule(BlockchainModule):
     def stop_ethereum(self):
         if self.ethereum_process:
             self._logger.info("Stopping Ethereum...")
-            self.kill_process(self.ethereum_process.pid)
+            os.killpg(os.getpgid(self.ethereum_process.pid), signal.SIGTERM)
 
         loop = get_event_loop()
         loop.stop()
