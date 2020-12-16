@@ -28,4 +28,4 @@ mkdir -p $VENV/src
 
 source $VENV/bin/activate
 
-python -m pip install bitshares pbkdf2 psutil py-algorand-sdk py-solc-x ruamel.yaml stellar_base stellar-sdk web3
+python -m pip install aiohttp bitshares pbkdf2 psutil py-algorand-sdk py-solc-x ruamel.yaml stellar-sdk web3

@@ -1,6 +1,8 @@
 import os
 import shutil
+import signal
 
+import aiohttp
 import requests
 import subprocess
 import time
@@ -11,9 +13,7 @@ from urllib.parse import quote_plus
 
 from datetime import datetime
 
-from stellar_base import Keypair, Horizon
-from stellar_base.builder import Builder
-from stellar_base.transaction_envelope import TransactionEnvelope
+from stellar_sdk import Keypair, TransactionBuilder, AiohttpClient, Server
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
@@ -53,11 +53,10 @@ class StellarModule(BlockchainModule):
         self._logger.info("Received message with type %s from peer %d", msg_type, from_id)
         if msg_type.startswith(b"send_account_seed"):
             account_nr = int(msg_type.split(b"_")[-1])
-            self.sender_keypairs[account_nr] = Keypair.from_seed(msg)
-            self._logger.info("Address of account %d: %s", account_nr,
-                              self.sender_keypairs[account_nr].address().decode())
+            self.sender_keypairs[account_nr] = Keypair.from_secret(msg)
+            self._logger.info("Address of account %d: %s", account_nr, self.sender_keypairs[account_nr].public_key)
         elif msg_type == b"receive_account_seed":
-            self.receiver_keypair = Keypair.from_seed(msg)
+            self.receiver_keypair = Keypair.from_secret(msg)
 
     @experiment_callback
     def init_db(self):
@@ -82,7 +81,7 @@ class StellarModule(BlockchainModule):
 
         os.environ["PGDATA"] = self.db_path
         cmd = "/usr/lib/postgresql/11/bin/pg_ctl start"
-        self.postgres_process = subprocess.Popen([cmd], shell=True)
+        self.postgres_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
     def setup_db(self):
@@ -185,7 +184,7 @@ ADDRESS="%s:%d"
             return
 
         cmd = "/home/martijn/stellar-core/stellar-core run 2>&1"
-        self.validator_process = subprocess.Popen([cmd], shell=True, stdout=subprocess.DEVNULL)
+        self.validator_process = subprocess.Popen([cmd], shell=True, stdout=subprocess.DEVNULL, preexec_fn=os.setsid)
 
     @experiment_callback
     def start_horizon(self):
@@ -199,18 +198,24 @@ ADDRESS="%s:%d"
 
         db_name = "stellar_%d_db" % self.my_id
         horizon_db_name = "stellar_horizon_%d_db" % self.my_id
-        cmd = '/home/martijn/gocode/bin/horizon --port %d ' \
-              '--ingest ' \
-              '--db-url "postgresql://tribler:tribler@localhost:5432/%s?sslmode=disable" ' \
-              '--stellar-core-db-url "postgresql://tribler:tribler@localhost:5432/%s?sslmode=disable" ' \
-              '--stellar-core-url "http://127.0.0.1:%d" ' \
-              '--network-passphrase="Standalone Pramati Network ; Oct 2018" ' \
-              '--apply-migrations ' \
-              '--log-level=info ' \
-              '--history-archive-urls "file:///tmp/stellar-core/history/vs" ' \
-              '--per-hour-rate-limit 0 > horizon.out 2>&1' % (19000 + self.my_id, horizon_db_name, db_name, 11000 + self.my_id)
+        args = '--port %d ' \
+               '--ingest ' \
+               '--db-url "postgresql://tribler:tribler@localhost:5432/%s?sslmode=disable" ' \
+               '--stellar-core-db-url "postgresql://tribler:tribler@localhost:5432/%s?sslmode=disable" ' \
+               '--stellar-core-url "http://127.0.0.1:%d" ' \
+               '--network-passphrase="Standalone Pramati Network ; Oct 2018" ' \
+               '--apply-migrations ' \
+               '--log-level=info ' \
+               '--history-archive-urls "file:///tmp/stellar-core/history/vs" ' \
+               '--per-hour-rate-limit 0' % (19000 + self.my_id, horizon_db_name, db_name, 11000 + self.my_id)
 
-        self.horizon_process = subprocess.Popen([cmd], shell=True)
+        # First initialize Horizon with an empty genesis state
+        cmd = '/home/martijn/gocode/bin/horizon expingest init-genesis-state %s > horizon_expingest.out 2>&1' % args
+        os.system(cmd)
+
+        # Now start Horizon
+        cmd = '/home/martijn/gocode/bin/horizon %s > horizon.out 2>&1' % args
+        self.horizon_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
     def upgrade_tx_set_size(self):
@@ -225,7 +230,7 @@ ADDRESS="%s:%d"
         self._logger.info("Response: %s", response.text)
 
     @experiment_callback
-    def create_accounts(self):
+    async def create_accounts(self):
         """
         Create accounts for every client. Send the secret seeds to the clients.
         """
@@ -235,63 +240,61 @@ ADDRESS="%s:%d"
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
         horizon_uri = "http://%s:%d" % (host, 19000 + validator_peer_id)
 
-        def on_content(content):
-            self._logger.info("Create accounts request failed with response: %s", content)
-
-        def on_response(response):
-            if response.code != 200:
-                treq.text_content(response).addCallback(on_content)
-            else:
-                self._logger.error("Create accounts request successful!")
-
-        def append_create_account_op(builder, receiver_pub_key, amount):
-            builder.append_create_account_op(receiver_pub_key, amount)
-            if len(builder.ops) == 100:
+        async def append_create_account_op(builder, server, root_keypair, receiver_pub_key, amount):
+            builder.append_create_account_op(receiver_pub_key, amount, root_keypair.public_key)
+            if len(builder.operations) == 100:
                 self._logger.info("Sending create transaction ops...")
-                builder.sign()
-                treq.post(horizon_uri + "/transactions/", data={"tx": builder.gen_xdr()}).addCallback(on_response)
+                tx = builder.build()
+                tx.sign(root_keypair)
+                response = await server.submit_transaction(tx)
+                print("Create account response: %s" % response)
+
                 builder = builder.next_builder()
 
             return builder
 
-        builder = Builder(secret="SDJ5AQWLIAYT22TCYSKOQALI3SNUMPAR63SEL73ASALDP6PYDN54FARM",
-                          horizon_uri=horizon_uri,
-                          network="Standalone Pramati Network ; Oct 2018")
+        async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
+            root_keypair = Keypair.from_secret("SDJ5AQWLIAYT22TCYSKOQALI3SNUMPAR63SEL73ASALDP6PYDN54FARM")
+            root_account = await server.load_account(root_keypair.public_key)
 
-        for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
-            receiver_keypair = Keypair.random()
-            receiver_pub_key = receiver_keypair.address().decode()
-            builder = append_create_account_op(builder, receiver_pub_key, "10000000")
-            self.experiment.send_message(client_index, b"receive_account_seed", receiver_keypair.seed())
+            builder = TransactionBuilder(
+                source_account=root_account,
+                network_passphrase="Standalone Pramati Network ; Oct 2018"
+            )
 
-            # Create the sender accounts
-            for account_ind in range(self.num_accounts_per_client):
-                sender_keypair = Keypair.random()
-                sender_pub_key = sender_keypair.address().decode()
-                builder = append_create_account_op(builder, sender_pub_key, "10000000")
-                self.experiment.send_message(client_index, b"send_account_seed_%d" % account_ind, sender_keypair.seed())
+            for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
+                receiver_keypair = Keypair.random()
+                builder = await append_create_account_op(builder, server, root_keypair, receiver_keypair.public_key, "10000000")
+                self.experiment.send_message(client_index, b"receive_account_seed", receiver_keypair.secret.encode())
 
-        if builder.ops:
-            self._logger.info("Sending create transaction ops...")
-            builder.sign()
-            treq.post(horizon_uri + "/transactions/", data={"tx": builder.gen_xdr()})
+                # Create the sender accounts
+                for account_ind in range(self.num_accounts_per_client):
+                    sender_keypair = Keypair.random()
+                    builder = await append_create_account_op(builder, server, root_keypair, sender_keypair.public_key, "10000000")
+                    self.experiment.send_message(client_index, b"send_account_seed_%d" % account_ind, sender_keypair.secret.encode())
+
+            # Send the remaining operations
+            if builder.operations:
+                self._logger.info("Sending remaining create transaction ops...")
+                tx = builder.build()
+                tx.sign(root_keypair)
+                response = await server.submit_transaction(tx)
+                print("Create account response: %s" % response)
 
     @experiment_callback
-    def get_initial_sq_num(self):
+    async def get_initial_sq_num(self):
         if not self.is_client():
             return
 
         validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
+        horizon_uri = "http://%s:%d" % (host, 19000 + validator_peer_id)
 
-        builder = Builder(secret=self.sender_keypairs[0].seed(),
-                          horizon_uri="http://%s:%d" % (host, 19000 + validator_peer_id),
-                          network="Standalone Pramati Network ; Oct 2018",
-                          fee=100)
-
-        # Set the sequence number for all accounts
-        for account_ind in range(self.num_accounts_per_client):
-            self.sequence_numbers[account_ind] = builder.sequence
+        async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
+            sender_account = await server.load_account(self.sender_keypairs[0])
+            # Set the sequence number for all accounts
+            for account_ind in range(self.num_accounts_per_client):
+                self.sequence_numbers[account_ind] = sender_account.sequence
 
     @experiment_callback
     def transfer(self):
@@ -362,22 +365,16 @@ ADDRESS="%s:%d"
                 tx_submit_times_file.write("%s,%d\n" % (tx_id, submit_time))
 
     @experiment_callback
-    def print_metrics(self):
+    async def print_ledgers(self):
         if self.is_client():
             return
 
-        horizon = Horizon("http://127.0.0.1:%d" % (19000 + self.my_id),)
-        metrics = horizon.metrics()
-        print("Horizon metrics: %s" % metrics)
+        validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
+        host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
+        horizon_uri = "http://%s:%d" % (host, 19000 + validator_peer_id)
 
-    @experiment_callback
-    def print_ledgers(self):
-        if self.is_client():
-            return
-
-        horizon = Horizon("http://127.0.0.1:%d" % (19000 + self.my_id), )
-        ledgers = horizon.ledgers(limit=100)
-        print("Ledgers: %s" % ledgers)
+        async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
+            print("Ledgers: %s" % server.ledgers())
 
     @experiment_callback
     def parse_ledgers(self):
@@ -414,13 +411,13 @@ ADDRESS="%s:%d"
         self._logger.info("Stopping Stellar...")
         if self.postgres_process:
             self._logger.info("Killing postgres")
-            self.postgres_process.kill()
+            os.killpg(os.getpgid(self.postgres_process.pid), signal.SIGTERM)
         if self.validator_process:
             self._logger.info("Killing validator")
-            self.validator_process.kill()
+            os.killpg(os.getpgid(self.validator_process.pid), signal.SIGTERM)
         if self.horizon_process:
             self._logger.info("Killing horizon")
-            self.horizon_process.kill()
+            os.killpg(os.getpgid(self.horizon_process.pid), signal.SIGTERM)
 
         loop = get_event_loop()
         loop.stop()
