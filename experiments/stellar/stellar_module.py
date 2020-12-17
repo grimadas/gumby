@@ -242,7 +242,7 @@ ADDRESS="%s:%d"
 
         async def append_create_account_op(builder, server, root_keypair, receiver_pub_key, amount):
             builder.append_create_account_op(receiver_pub_key, amount, root_keypair.public_key)
-            if len(builder.operations) == 100:
+            if len(builder.operations) == 1:
                 self._logger.info("Sending create transaction ops...")
                 tx = builder.build()
                 tx.sign(root_keypair)
