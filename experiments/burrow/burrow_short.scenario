@@ -1,0 +1,7 @@
+&module gumby.modules.experiment_module.ExperimentModule
+&module experiments.burrow.burrow_module.BurrowModule
+
+@0:1 generate_config {1}
+@0:5 start_burrow
+@0:10 deploy_contract {1}
+@0:20 stop_burrow
