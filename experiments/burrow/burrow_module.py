@@ -1,15 +1,21 @@
 import json
 import os
+import random
 import shutil
 import signal
+import string
 import subprocess
+import time
 from asyncio import get_event_loop
+from binascii import hexlify, unhexlify
+from threading import Thread
 
 import toml
 
-import yaml
+from solcx import compile_files, set_solc_version
 
 from web3 import Web3
+from web3.exceptions import TimeExhausted
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
@@ -23,9 +29,14 @@ class BurrowModule(BlockchainModule):
         super(BurrowModule, self).__init__(experiment)
         self.burrow_process = None
         self.validator_address = None
-        self.contract_address = None
-        self.validator_addresses = []
+        self.deployed_contract_address = None
+        self.deployed_contract_abi = None
+        self.deployed_contract = None
+        self.validator_addresses = {}
         self.experiment.message_callback = self
+
+        self.submitted_transactions = {}
+        self.confirmed_transactions = {}
 
     def on_all_vars_received(self):
         super(BurrowModule, self).on_all_vars_received()
@@ -33,26 +44,29 @@ class BurrowModule(BlockchainModule):
 
     @experiment_callback
     def transfer(self):
-        # TODO only works for node 1
-        yaml_json = {
-            "jobs": [{
-                "name": "transfer",
-                "call": {
-                    "destination": self.contract_address,
-                    "function": "transfer",
-                    "data": ["60A2A6FD47B4CC6653560132D628195B35F35A04", 1000, "AAAAA"]
-                }
-            }]
-        }
+        validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
+        host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
 
-        deploy_file_name = "transfer.yaml"
-        with open(deploy_file_name, "w") as out_file:
-            out_file.write(yaml.dump(yaml_json))
+        def create_and_submit_tx():
+            url = 'http://%s:%d' % (host, 12000 + validator_peer_id)
+            w3 = Web3(Web3.HTTPProvider(url))
+            random_id = ''.join(random.choice(string.ascii_uppercase) for _ in range(5))
+            submit_time = int(round(time.time() * 1000))
+            self.submitted_transactions[random_id] = submit_time
 
-        process = subprocess.Popen([self.get_deploy_command(deploy_file_name)], shell=True)
+            tx_hash = self.deployed_contract.functions.transfer(
+                w3.toChecksumAddress("EB77C5D07D50D9853EF90CB6B32E38755A9BDF2F"), 1, random_id).transact(
+                {"from": w3.toChecksumAddress(self.validator_addresses[validator_peer_id])})
+            try:
+                _ = w3.eth.waitForTransactionReceipt(tx_hash)
+                confirm_time = int(round(time.time() * 1000))
+                self.confirmed_transactions[random_id] = confirm_time
+            except TimeExhausted:
+                print("Time exhausted for tx with hash: %d" % tx_hash)
 
-    def get_deploy_command(self, script_name):
-        return "/home/martijn/burrow/burrow deploy --local-abi --address %s --chain 127.0.0.1:%d --bin-path deploy_data/bin %s" % (self.validator_address, 16000 + self.experiment.my_id, script_name)
+        t = Thread(target=create_and_submit_tx)
+        t.daemon = True
+        t.start()
 
     def on_id_received(self):
         super(BurrowModule, self).on_id_received()
@@ -61,7 +75,18 @@ class BurrowModule(BlockchainModule):
         self._logger.info("Received message with type %s from peer %d", msg_type, from_id)
         if msg_type == b"validator_address":
             validator_address = msg.decode()
-            self.validator_addresses.append(validator_address)
+            self.validator_addresses[from_id] = validator_address
+        elif msg_type == b"contract_address":
+            self.deployed_contract_address = msg.decode()
+        elif msg_type == b"contract_abi":
+            self.deployed_contract_abi = json.loads(unhexlify(msg).decode())
+
+        if self.deployed_contract_address and self.deployed_contract_abi:
+            validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
+            host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
+            url = 'http://%s:%d' % (host, 12000 + validator_peer_id)
+            w3 = Web3(Web3.HTTPProvider(url))
+            self.deployed_contract = w3.eth.contract(address=self.deployed_contract_address, abi=self.deployed_contract_abi)
 
     @experiment_callback
     def generate_config(self):
@@ -113,14 +138,19 @@ class BurrowModule(BlockchainModule):
             node_config["Tendermint"]["ListenPort"] = "%d" % (10000 + self.experiment.my_id)
             node_config["Tendermint"]["ListenHost"] = "0.0.0.0"
             node_config["RPC"]["Web3"]["ListenPort"] = "%d" % (12000 + self.experiment.my_id)
+            node_config["RPC"]["Web3"]["ListenHost"] = "0.0.0.0"
             node_config["RPC"]["Info"]["ListenPort"] = "%d" % (14000 + self.experiment.my_id)
             node_config["RPC"]["GRPC"]["ListenPort"] = "%d" % (16000 + self.experiment.my_id)
 
             self.validator_address = node_config["ValidatorAddress"]
+            self.validator_addresses[self.my_id] = self.validator_address
             self._logger.info("Acting with validator address %s", self.validator_address)
 
-            if self.experiment.my_id != 1:
+            # Send the validator address to node 1 and all clients
+            if self.my_id != 1:
                 self.experiment.send_message(1, b"validator_address", self.validator_address.encode())
+            for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
+                self.experiment.send_message(client_index, b"validator_address", self.validator_address.encode())
 
             # Fix the persistent peers
             persistent_peers = node_config["Tendermint"]["PersistentPeers"].split(",")
@@ -146,48 +176,124 @@ class BurrowModule(BlockchainModule):
 
         self._logger.info("Burrow started...")
 
+    # @experiment_callback
+    # def deploy_contract(self):
+    #     print("Deploying contract...")
+    #
+    #     contracts_script_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "ethereum", "contracts")
+    #
+    #     os.mkdir("deploy_data")
+    #     shutil.copyfile(os.path.join(contracts_script_dir, "erc20.sol"), os.path.join("deploy_data", "erc20.sol"))
+    #
+    #     yaml_json = {
+    #         "jobs": [{
+    #             "name": "deploySmartContract",
+    #             "deploy": {
+    #                 "contract": "erc20.sol",
+    #                 "instance": "ERC20Basic",
+    #                 "data": [10000000]
+    #             }
+    #         }]
+    #     }
+    #
+    #     with open(os.path.join("deploy_data", "deploy.yaml"), "w") as out_file:
+    #         out_file.write(yaml.dump(yaml_json))
+    #
+    #     extended_path = "/home/martijn/solc:%s" % os.getenv("PATH")  # Make sure solc can be found
+    #     cmd = "/home/martijn/burrow/burrow deploy --address %s --chain 127.0.0.1:16001 deploy.yaml" % self.validator_address
+    #     process = subprocess.Popen([cmd], shell=True, env={'PATH': extended_path}, cwd=os.path.join(os.getcwd(), "deploy_data"))
+    #     process.wait()
+    #
+    #     with open(os.path.join(os.getcwd(), "deploy_data", "deploy.output.json"), "r") as deploy_output_file:
+    #         content = deploy_output_file.read()
+    #         json_content = json.loads(content)
+    #
+    #     self.contract_address = json_content["deploySmartContract"]
+    #     self._logger.info("Smart contract address: %s" % self.contract_address)
+
     @experiment_callback
-    def deploy_contract(self):
-        print("Deploying contract...")
+    def deploy_contract(self, contract_path, main_class_name):
+        self._logger.info("Deploying contract...")
 
-        contracts_script_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "ethereum", "contracts")
+        set_solc_version('v0.6.2')
 
-        os.mkdir("deploy_data")
-        shutil.copyfile(os.path.join(contracts_script_dir, "erc20.sol"), os.path.join("deploy_data", "erc20.sol"))
+        url = 'http://localhost:%d' % (12000 + self.experiment.my_id)
+        w3 = Web3(Web3.HTTPProvider(url))
 
-        yaml_json = {
-            "jobs": [{
-                "name": "deploySmartContract",
-                "deploy": {
-                    "contract": "erc20.sol",
-                    "instance": "ERC20Basic",
-                    "data": [10000000]
-                }
-            }]
-        }
+        def deploy_contract_with_w3(w3, contract_interface):
+            contract = w3.eth.contract(abi=contract_interface['abi'], bytecode=contract_interface['bin'])
+            tx_hash = contract.constructor(100000000000).transact({"from": w3.toChecksumAddress(self.validator_address)})
+            address = w3.eth.waitForTransactionReceipt(tx_hash)['contractAddress']
+            return address
 
-        with open(os.path.join("deploy_data", "deploy.yaml"), "w") as out_file:
-            out_file.write(yaml.dump(yaml_json))
+        burrow_dir = os.path.dirname(os.path.realpath(__file__))
+        full_contract_path = os.path.join(burrow_dir, "..", "ethereum", contract_path)
+        if not os.path.exists(full_contract_path):
+            self._logger.warning("Contract in path %s does not exist!", full_contract_path)
+            return
 
-        extended_path = "/home/martijn/solc:%s" % os.getenv("PATH")  # Make sure solc can be found
-        cmd = "/home/martijn/burrow/burrow deploy --address %s --chain 127.0.0.1:16001 deploy.yaml" % self.validator_address
-        process = subprocess.Popen([cmd], shell=True, env={'PATH': extended_path}, cwd=os.path.join(os.getcwd(), "deploy_data"))
-        process.wait()
+        contract_dir = os.path.dirname(full_contract_path)
 
-        with open(os.path.join(os.getcwd(), "deploy_data", "deploy.output.json"), "r") as deploy_output_file:
-            content = deploy_output_file.read()
-            json_content = json.loads(content)
+        cur_dir = os.getcwd()
+        os.chdir(contract_dir)
+        contract_name = os.path.basename(full_contract_path)
+        self._logger.info("Compiling contract %s", contract_name)
+        compiled_sol = compile_files([os.path.basename(full_contract_path)], optimize=True)
+        os.chdir(cur_dir)
 
-        self.contract_address = json_content["deploySmartContract"]
-        self._logger.info("Smart contract address: %s" % self.contract_address)
+        contract_interface = compiled_sol["%s:%s" % (contract_name, main_class_name)]
+        self._logger.info("Contract ABI: %s", contract_interface['abi'])
+        address = deploy_contract_with_w3(w3, contract_interface)
+        self._logger.info("Deployed contract to: %s", address)
 
-        # TODO send ABI/deployment data to others
+        self.deployed_contract_address = address
+        self.deployed_contract_abi = contract_interface['abi']
+
+        for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
+            # Send the necessary info to all clients
+            self.experiment.send_message(client_index, b"contract_address", str(address).encode())
+            self.experiment.send_message(client_index, b"contract_abi",
+                                         hexlify(json.dumps(contract_interface['abi']).encode()))
+
+        self.deployed_contract = w3.eth.contract(address=address, abi=contract_interface['abi'])
+
+        # Transfer funds to other validator addresses
+        for validator_id in range(2, self.num_validators + 1):
+            tx_hash = self.deployed_contract.functions.transfer(
+                w3.toChecksumAddress(self.validator_addresses[validator_id]), 100000, "AAAAA").transact(
+                {"from": w3.toChecksumAddress(self.validator_address)})
+            _ = w3.eth.waitForTransactionReceipt(tx_hash)
+
+        # event_filter = self.deployed_contract.events.Transfer.createFilter(fromBlock='latest')
+        #
+        # # Listen for transfer events
+        # async def log_loop():
+        #     while True:
+        #         for event in event_filter.get_new_entries():
+        #             print("EVENT: %s" % event)
+        #             complete_time = int(round(time.time() * 1000))
+        #             tx_id = event["args"]["identifier"]
+        #             self.confirmed_transactions[tx_id] = complete_time
+        #         await sleep(0.5)
+        #
+        # ensure_future(log_loop())
 
     @experiment_callback
     def write_stats(self):
         """
         Write away statistics.
         """
+        if self.is_client():
+            # Write submitted transactions
+            with open("submit_times.txt", "w") as tx_file:
+                for tx_id, submit_time in self.submitted_transactions.items():
+                    tx_file.write("%s,%d\n" % (tx_id, submit_time))
+
+            # Write confirmed transactions
+            with open("confirmed_txs.txt", "w") as tx_file:
+                for tx_id, confirm_time in self.confirmed_transactions.items():
+                    tx_file.write("%s,%d\n" % (tx_id, confirm_time))
+
         if self.is_client():
             return
 
