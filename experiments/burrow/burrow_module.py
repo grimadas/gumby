@@ -9,6 +9,8 @@ import toml
 
 import yaml
 
+from web3 import Web3
+
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
 from gumby.modules.experiment_module import static_module
@@ -25,8 +27,32 @@ class BurrowModule(BlockchainModule):
         self.validator_addresses = []
         self.experiment.message_callback = self
 
+    def on_all_vars_received(self):
+        super(BurrowModule, self).on_all_vars_received()
+        self.transactions_manager.transfer = self.transfer
+
+    @experiment_callback
+    def transfer(self):
+        # TODO only works for node 1
+        yaml_json = {
+            "jobs": [{
+                "name": "transfer",
+                "call": {
+                    "destination": self.contract_address,
+                    "function": "transfer",
+                    "data": ["60A2A6FD47B4CC6653560132D628195B35F35A04", 1000, "AAAAA"]
+                }
+            }]
+        }
+
+        deploy_file_name = "transfer.yaml"
+        with open(deploy_file_name, "w") as out_file:
+            out_file.write(yaml.dump(yaml_json))
+
+        process = subprocess.Popen([self.get_deploy_command(deploy_file_name)], shell=True)
+
     def get_deploy_command(self, script_name):
-        return "burrow deploy --local-abi --address %s --chain 127.0.0.1:%d --bin-path /home/pouwelse/energy_trading_smart_contract/bin %s" % (self.validator_address, 16000 + self.experiment.my_id, script_name)
+        return "/home/martijn/burrow/burrow deploy --local-abi --address %s --chain 127.0.0.1:%d --bin-path deploy_data/bin %s" % (self.validator_address, 16000 + self.experiment.my_id, script_name)
 
     def on_id_received(self):
         super(BurrowModule, self).on_id_received()
@@ -148,19 +174,32 @@ class BurrowModule(BlockchainModule):
         process = subprocess.Popen([cmd], shell=True, env={'PATH': extended_path}, cwd=os.path.join(os.getcwd(), "deploy_data"))
         process.wait()
 
-    def get_contract_address(self):
-        """
-        Read the contract address from the deployment output.
-        """
-        if self.contract_address:
-            return self.contract_address
-
-        with open("/home/pouwelse/energy_trading_smart_contract/deploy.output.json", "r") as deploy_output_file:
+        with open(os.path.join(os.getcwd(), "deploy_data", "deploy.output.json"), "r") as deploy_output_file:
             content = deploy_output_file.read()
             json_content = json.loads(content)
 
-        self.contract_address = json_content["deployEnergyTradingSmartContract"]
-        return self.contract_address
+        self.contract_address = json_content["deploySmartContract"]
+        self._logger.info("Smart contract address: %s" % self.contract_address)
+
+        # TODO send ABI/deployment data to others
+
+    @experiment_callback
+    def write_stats(self):
+        """
+        Write away statistics.
+        """
+        if self.is_client():
+            return
+
+        url = 'http://localhost:%d' % (12000 + self.experiment.my_id)
+        w3 = Web3(Web3.HTTPProvider(url))
+
+        # Dump blockchain
+        latest_block = w3.eth.getBlock('latest')
+        with open("blockchain.txt", "w") as out_file:
+            for block_nr in range(1, latest_block.number + 1):
+                block = w3.eth.getBlock(block_nr)
+                out_file.write(w3.toJSON(block) + "\n")
 
     @experiment_callback
     def stop_burrow(self):
