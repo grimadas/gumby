@@ -1,10 +1,11 @@
 import hashlib
 import json
 import os
+import random
 import signal
 import subprocess
 import time
-from asyncio import get_event_loop
+from asyncio import get_event_loop, sleep
 from binascii import hexlify
 from threading import Thread
 
@@ -23,8 +24,7 @@ class AvalancheModule(BlockchainModule):
         self.avalanche_process = None
         self.avax_address = None
         self.avax_addresses = {}
-        self.staking_address = None
-        self.staking_addresses = {}
+        self.node_ids = {}
         self.transactions = {}
         self.experiment.message_callback = self
 
@@ -37,13 +37,13 @@ class AvalancheModule(BlockchainModule):
         if msg_type == b"avax_address":
             avax_address = msg.decode()
             self.avax_addresses[from_id] = avax_address
-        elif msg_type == b"staking_address":
-            staking_address = msg.decode()
-            self.staking_addresses[from_id] = staking_address
+        elif msg_type == b"node_id":
+            self.node_ids[from_id] = msg.decode()
 
     @experiment_callback
     def sync_staking_keys(self):
-        # TODO generate staking keys
+        # More staking keys can be generated using the following command (on surfnet1, in /home/martijn/avalanche/staking):
+        # /home/martijn/go/bin/go run gen_staker_key.go <PEER_ID_HERE>
         my_host, _ = self.experiment.get_peer_ip_port_by_id(self.experiment.my_id)
         other_hosts = set()
         for peer_id in self.experiment.all_vars.keys():
@@ -75,6 +75,7 @@ class AvalancheModule(BlockchainModule):
                   "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker1.crt --plugin-dir=/home/martijn/avalanche/plugins " \
                   "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker1.key > avalanche.out" % \
                   (my_host, http_port, staking_port)
+            self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
         else:
             cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=2 --snow-quorum-size=2 " \
                   "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
@@ -84,7 +85,8 @@ class AvalancheModule(BlockchainModule):
                   "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
                   (my_host, http_port, staking_port, self.my_id, bootstrap_host, self.my_id, self.my_id)
 
-        self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+            await sleep(random.random() * 5)
+            self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
     def create_keystore_user(self):
@@ -159,30 +161,34 @@ class AvalancheModule(BlockchainModule):
         for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
             self.experiment.send_message(client_index, b"avax_address", self.avax_address.encode())
 
-        if self.my_id > 5:  # Create a staking address
-            payload = {
-                "method": "platform.createAddress",
-                "params": [{
-                    "username": "peer%d" % self.my_id,
-                    "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
-                }],
-                "jsonrpc": "2.0",
-                "id": 0,
-            }
+    @experiment_callback
+    def share_node_id(self):
+        if self.is_client() or self.my_id <= 5:
+            return
 
-            response = requests.post("http://localhost:%d/ext/bc/P" % (12000 + self.my_id), json=payload).json()
-            self._logger.info("Create address response: %s", response)
-            self.staking_address = response["result"]["address"]
-            self.experiment.send_message(1, b"staking_address", self.staking_address.encode())
+        self._logger.info("Sharing node ID with bootstrap peer")
+
+        # Get the node ID
+        payload = {
+            "method": "info.getNodeID",
+            "params": [{}],
+            "jsonrpc": "2.0",
+            "id": 0,
+        }
+
+        response = requests.post("http://localhost:%d/ext/info" % (12000 + self.my_id), json=payload).json()
+        node_id = response["result"]["nodeID"]
+        self.experiment.send_message(1, b"node_id", node_id.encode())
 
     @experiment_callback
-    def transfer_funds_to_others(self):
+    async def transfer_funds_to_others(self):
         if self.is_client():
             return
 
         self._logger.info("Transferring funds to others...")
 
         for avax_address in self.avax_addresses.values():
+            self._logger.info("Transferring initial funds to address %s", avax_address)
             payload = {
                 "method": "wallet.send",
                 "params": [{
@@ -199,38 +205,20 @@ class AvalancheModule(BlockchainModule):
             response = requests.post("http://localhost:%d/ext/bc/X/wallet" % (12000 + self.my_id), json=payload).json()
             self._logger.info("Transfer funds response: %s", response)
 
-        # Send from X-chain to P-chain
-        for staking_address in self.staking_addresses.values():
-            payload = {
-                "method": "avm.exportAVAX",
-                "params": [{
-                    "to": staking_address,
-                    "amount": 2000000000000,
-                    "username": "peer%d" % self.my_id,
-                    "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
-                }],
-                "jsonrpc": "2.0",
-                "id": 0,
-            }
-
-            response = requests.post("http://localhost:%d/ext/bc/X" % (12000 + self.my_id), json=payload).json()
-            self._logger.info("Export funds response: %s", response)
-
     @experiment_callback
-    def register_as_validator(self):
-        if self.is_client() or self.my_id <= 5:
+    async def register_validators(self):
+        if self.is_client():
             return
 
-        self._logger.info("Registering as validator...")
+        self._logger.info("Registering validators...")
 
-        # Import funds from X-chain
+        # Import the bootstrap address in the P chain
         payload = {
-            "method": "platform.importAVAX",
+            "method": "platform.importKey",
             "params": [{
-                "sourceChain": "X",
-                "to": self.staking_address,
                 "username": "peer%d" % self.my_id,
                 "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
+                "privateKey": "PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
             }],
             "jsonrpc": "2.0",
             "id": 0,
@@ -238,53 +226,67 @@ class AvalancheModule(BlockchainModule):
 
         response = requests.post("http://localhost:%d/ext/P" % (12000 + self.my_id), json=payload).json()
         self._logger.info("Import funds response: %s", response)
+        staking_address = response["result"]["address"]
 
-        # Create a reward address
-        payload = {
-            "method": "platform.createAddress",
-            "params": [{
-                "username": "peer%d" % self.my_id,
-                "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
-            }],
-            "jsonrpc": "2.0",
-            "id": 0,
-        }
+        tx_ids = []
 
-        response = requests.post("http://localhost:%d/ext/bc/P" % (12000 + self.my_id), json=payload).json()
-        self._logger.info("Create address response: %s", response)
-        reward_address = response["result"]["address"]
+        for validator_id, node_id in self.node_ids.items():
+            # Create a reward address
+            payload = {
+                "method": "platform.createAddress",
+                "params": [{
+                    "username": "peer%d" % self.my_id,
+                    "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
+                }],
+                "jsonrpc": "2.0",
+                "id": 0,
+            }
 
-        # Get the node ID
-        payload = {
-            "method": "info.getNodeID",
-            "params": [{}],
-            "jsonrpc": "2.0",
-            "id": 0,
-        }
+            response = requests.post("http://localhost:%d/ext/bc/P" % (12000 + self.my_id), json=payload).json()
+            self._logger.info("Create address response: %s", response)
+            reward_address = response["result"]["address"]
 
-        response = requests.post("http://localhost:%d/ext/info" % (12000 + self.my_id), json=payload).json()
-        node_id = response["result"]["nodeID"]
+            # Register as validator
+            payload = {
+                "method": "platform.addValidator",
+                "params": [{
+                    "nodeID": node_id,
+                    "from": [staking_address],
+                    "startTime": '%d' % (int(time.time()) + 15),
+                    "endTime": '%d' % (int(time.time()) + 30 * 24 * 3600),
+                    "stakeAmount": 2000000000000,
+                    "rewardAddress": reward_address,
+                    "delegationFeeRate": 10,
+                    "username": "peer%d" % self.my_id,
+                    "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
+                }],
+                "jsonrpc": "2.0",
+                "id": 0,
+            }
 
-        # Register yourself as validator
-        payload = {
-            "method": "platform.addValidator",
-            "params": [{
-                "nodeID": node_id,
-                "from": [self.staking_address],
-                "startTime": '%d' % (int(time.time()) + 5),
-                "endTime": '%d' % (int(time.time()) + 3600),
-                "stakeAmount": 2000000000000,
-                "rewardAddress": reward_address,
-                "delegationFeeRate": 10,
-                "username": "peer%d" % self.my_id,
-                "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
-            }],
-            "jsonrpc": "2.0",
-            "id": 0,
-        }
+            response = requests.post("http://localhost:%d/ext/P" % (12000 + self.my_id), json=payload).json()
+            self._logger.info("Add validator response: %s", response)
+            tx_id = response["result"]["txID"]
+            tx_ids.append(tx_id)
 
-        response = requests.post("http://localhost:%d/ext/P" % (12000 + self.my_id), json=payload).json()
-        self._logger.info("Add validator response: %s", response)
+            await sleep(1)
+
+        await sleep(15)
+
+        for tx_id in tx_ids:
+            self._logger.info("Getting status of validator tx")
+            payload = {
+                "method": "platform.getTxStatus",
+                "params": [{
+                    "txID": tx_id,
+                    "includeReason": True,
+                }],
+                "jsonrpc": "2.0",
+                "id": 0,
+            }
+
+            response = requests.post("http://localhost:%d/ext/P" % (12000 + self.my_id), json=payload).json()
+            self._logger.info("Validator tx status: %s", response)
 
     @experiment_callback
     def transfer(self):
