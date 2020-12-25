@@ -1,7 +1,9 @@
 import decimal
+import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -11,13 +13,9 @@ import aiohttp
 from aiohttp import web
 
 import pexpect
+from diem import LocalAccount, jsonrpc, stdlib, utils, testnet, diem_types, chain_ids
 
-import toml
-
-import libra
-from libra import Client, RawTransaction, SignedTransaction, TransactionError
-from libra.proto.admission_control_pb2 import SubmitTransactionRequest
-from libra.transaction import Script, TransactionPayload
+from ruamel.yaml import YAML
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
@@ -34,16 +32,18 @@ class LibraModule(BlockchainModule):
     def __init__(self, experiment):
         super(LibraModule, self).__init__(experiment)
         self.libra_validator_process = None
-        self.faucet_process = None
-        self.libra_client = None
+        self.diem_client = None
         self.faucet_client = None
         self.faucet_service = None
-        self.libra_path = "/home/pouwelse/libra"
+        self.libra_path = "/home/martijn/diem"
         self.validator_config = None
         self.validator_id = None
-        self.validator_peer_id = None
         self.validator_ids = None
-        self.wallet = None
+        self.peer_ids = {}
+        self.waypoint_id = None
+        self.validator_network_ids = {}
+        self.sender_account = None
+        self.receiver_account = None
         self.tx_info = {}
         self.last_tx_confirmed = -1
         self.site = None
@@ -56,20 +56,32 @@ class LibraModule(BlockchainModule):
         self.transactions_manager.transfer = self.transfer
 
     @experiment_callback
-    def generate_config(self):
+    async def generate_config(self):
         """
         Generate the initial configuration files.
         """
         self._logger.info("Generating config...")
 
         # Step 1: remove configuration from previous run
-        shutil.rmtree("%s/das_config" % self.libra_path, ignore_errors=True)
+        shutil.rmtree("%s/libra_swarm_config" % self.libra_path, ignore_errors=True)
 
         # Step 2: generate new configuration
-        cmd = "%s/target/release/libra-config -b %s/config/data/configs/node.config.toml " \
-              "-m %s/terraform/validator-sets/dev/mint.key -o %s/das_config -n %d" % \
-              (self.libra_path, self.libra_path, self.libra_path, self.libra_path, self.num_validators)
-        os.system(cmd)
+        cmd = "%s/target/release/diem-swarm -n %d --diem-node %s/target/release/diem-node -c %s/libra_swarm_config > genconfig.out 2>&1" % \
+              (self.libra_path, self.num_validators, self.libra_path, self.libra_path)
+        config_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        await sleep(10)
+        os.killpg(os.getpgid(config_process.pid), signal.SIGTERM)
+
+        self._logger.info("Sharing config to other validators...")
+
+        my_host, _ = self.experiment.get_peer_ip_port_by_id(self.experiment.my_id)
+        other_hosts = set()
+        for peer_id in self.experiment.all_vars.keys():
+            host = self.experiment.all_vars[peer_id]['host']
+            if host not in other_hosts and host != my_host:
+                other_hosts.add(host)
+                self._logger.info("Syncing configuration with host %s", host)
+                os.system("rsync -r --delete /home/martijn/diem/libra_swarm_config martijn@%s:/home/martijn/diem/" % host)
 
     @experiment_callback
     def init_config(self):
@@ -77,61 +89,69 @@ class LibraModule(BlockchainModule):
         Initialize the configuration. In particular, make sure the addresses of the seed nodes are correctly set.
         """
         self.validator_id = self.my_id - 1
-        if not self.is_client():
-            with open(os.path.join(self.libra_path, "das_config", "%d" % self.validator_id,
-                                   "node.config.toml"), "r") as node_config_file:
-                content = node_config_file.read()
-                node_config = toml.loads(content)
-                self.validator_peer_id = node_config["networks"][0]["peer_id"]
+        if self.is_client():
+            return
 
-                listen_address = node_config["networks"][0]["listen_address"]
-                listen_address = listen_address.replace("ip6", "ip4")
-                listen_address = listen_address.replace("::1", "0.0.0.0")
-                node_config["networks"][0]["listen_address"] = listen_address
+        self._logger.info("Extracting network identifiers...")
 
-                advertised_address = node_config["networks"][0]["advertised_address"]
-                advertised_address = advertised_address.replace("ip6", "ip4")
-                advertised_address = advertised_address.replace("::1", "0.0.0.0")
-                node_config["networks"][0]["advertised_address"] = advertised_address
+        for validator_id in range(0, self.num_validators):
+            self._logger.info("Reading initial config of validator %d...", validator_id)
 
-                node_config["admission_control"]["address"] = "0.0.0.0"
-                node_config["mempool"]["capacity_per_user"] = 10000
-                node_config["consensus"]["max_block_size"] = 10000
-                node_config["execution"]["genesis_file_location"] = os.path.join(self.libra_path, "terraform",
-                                                                                 "validator-sets", "dev",
-                                                                                 "genesis.blob")
+            yaml = YAML()
+            with open(os.path.join(self.libra_path, "libra_swarm_config", "%d" % validator_id,
+                                   "node.yaml"), "r") as node_config_file:
+                node_config = yaml.load(node_config_file)
 
-                # Fix data directories
-                node_config["base"]["data_dir_path"] = os.getcwd()
-                node_config["storage"]["dir"] = os.path.join(os.getcwd(), "libradb", "db")
+            old_validator_network_listen_address = node_config["validator_network"]["listen_address"]
+            old_validator_network_listen_port = int(old_validator_network_listen_address.split("/")[-1])
 
-            # Write the updated node configuration
-            with open(os.path.join(self.libra_path, "das_config", "%d" % self.validator_id,
-                                   "node.config.toml"), "w") as node_config_file:
-                node_config_file.write(toml.dumps(node_config))
+            log_path = os.path.join(self.libra_path, "libra_swarm_config", "logs", "%d.log" % validator_id)
+            with open(log_path, "r") as log_file:
+                for line in log_file.readlines():
+                    if "Start listening for incoming connections on" in line:
+                        full_network_string = line.split(" ")[10]
+                        port = int(full_network_string.split("/")[4])
+                        if port == old_validator_network_listen_port:
+                            self._logger.info("Network ID of validator %d: %s", validator_id, full_network_string)
 
-            # Update the seed configuration
-            with open(os.path.join(self.libra_path, "das_config", "%d" % self.validator_id,
-                                   "%s.seed_peers.config.toml" % self.validator_peer_id), "r") as seed_peers_file:
-                content = seed_peers_file.read()
-                seed_peers_config = toml.loads(content)
-                self.validator_ids = sorted(list(seed_peers_config["seed_peers"].keys()))
+                            # Get the peer ID
+                            peer_id = json.loads(line.split(" ")[-1])["network_context"]["peer_id"]
+                            self._logger.info("Peer ID of validator %d: %s", validator_id, peer_id)
+                            self.peer_ids[validator_id] = peer_id
 
-            # Adjust
-            for validator_index in range(len(self.validator_ids)):
-                ip, _ = self.experiment.get_peer_ip_port_by_id(validator_index + 1)
-                validator_id = self.validator_ids[validator_index]
+                            # Modify the network string to insert the right IP address
+                            host, _ = self.experiment.get_peer_ip_port_by_id(validator_id + 1)
+                            parts = full_network_string.split("/")
+                            parts[2] = host
+                            full_network_string = "/".join(parts)
 
-                current_host = seed_peers_config["seed_peers"][validator_id][0]
-                parts = current_host.split("/")
-                listen_port = parts[4]
+                            self.validator_network_ids[validator_id] = full_network_string
+                            break
 
-                seed_peers_config["seed_peers"][validator_id][0] = "/ip4/%s/tcp/%s" % (ip, listen_port)
+                    if "Genesis calculated" in line and not self.waypoint_id:
+                        self.waypoint_id = line[-68:-4]
+                        self._logger.info("Waypoint ID: %s", self.waypoint_id)
 
-            # Write
-            with open(os.path.join(self.libra_path, "das_config", "%d" % self.validator_id,
-                                   "%s.seed_peers.config.toml" % self.validator_peer_id), "w") as seed_peers_file:
-                seed_peers_file.write(toml.dumps(seed_peers_config))
+        self._logger.info("Modifying configuration file...")
+
+        yaml = YAML()
+        with open(os.path.join(self.libra_path, "libra_swarm_config", "%d" % self.validator_id,
+                               "node.yaml"), "r") as node_config_file:
+            node_config = yaml.load(node_config_file)
+
+        node_config["mempool"]["capacity_per_user"] = 10000
+        node_config["consensus"]["max_block_size"] = 10000
+        node_config["base"]["data_dir"] = os.getcwd()
+        node_config["json_rpc"]["address"] = "0.0.0.0:%d" % (12000 + self.my_id)
+
+        for validator_id, network_string in self.validator_network_ids.items():
+            if validator_id == self.validator_id:
+                continue
+            node_config["validator_network"]["seed_addrs"][self.peer_ids[validator_id]] = [network_string]
+
+        with open(os.path.join(self.libra_path, "libra_swarm_config", "%d" % self.validator_id,
+                               "node.yaml"), "w") as crypto_config_file:
+            yaml.dump(node_config, crypto_config_file)
 
     @experiment_callback
     def start_libra_validator(self):
@@ -139,15 +159,12 @@ class LibraModule(BlockchainModule):
         if self.is_client():
             return
 
-        # Start a validator
-        my_libra_id = self.validator_ids[self.my_id - 1]
+        self._logger.info("Starting libra validator with id %s...", self.validator_id)
+        libra_exec_path = os.path.join(self.libra_path, "target", "release", "diem-node")
+        config_path = os.path.join(self.libra_path, "libra_swarm_config", "%d" % self.validator_id, "node.yaml")
 
-        self._logger.info("Starting libra validator with id %s...", my_libra_id)
-
-        cmd = '/home/pouwelse/libra/target/release/libra-node -f %s > %s 2>&1' \
-              % ('/home/pouwelse/libra/das_config/%d/node.config.toml' %
-                 (self.my_id - 1), os.path.join(os.getcwd(), 'libra_output.log'))
-        self.libra_validator_process = subprocess.Popen([cmd], shell=True)
+        cmd = '%s -f %s > %s 2>&1' % (libra_exec_path, config_path, os.path.join(os.getcwd(), 'diem_output.log'))
+        self.libra_validator_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     async def on_mint_request(self, request):
         address = request.rel_url.query['address']
@@ -163,38 +180,25 @@ class LibraModule(BlockchainModule):
         if amount > MAX_MINT:
             return web.Response(text="Exceeded max amount of {}".format(MAX_MINT / (10 ** 6)), status=400)
 
-        self.faucet_client.sendline("a m {} {}".format(address, amount / (10 ** 6)))
-        self.faucet_client.expect("Mint request submitted", timeout=2)
+        self.faucet_client.sendline("a m {} {} XUS".format(address, amount / (10 ** 6)))
+        self.faucet_client.expect("Finished sending coins from faucet!", timeout=3)
 
         return web.Response(text="done")
 
     @experiment_callback
-    async def start_libra_client(self):
-        validator_peer_id = (self.my_id - 1) % self.num_validators
-
-        with open(os.path.join(self.libra_path, "das_config", "%d" % validator_peer_id, "node.config.toml"), "r") \
-                as validator_config_file:
-            content = validator_config_file.read()
-            validator_config = toml.loads(content)
-
-        port = validator_config["admission_control"]["admission_control_service_port"]
-        host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id + 1)
-
+    async def start_libra_cli(self):
         # Get the faucet host
         faucet_host, _ = self.experiment.get_peer_ip_port_by_id(1)
 
         if self.my_id == 1:
             # Start the minting service
-            cmd = "/home/pouwelse/libra/target/release/client " \
-                  "--host %s " \
-                  "--port %s " \
-                  "--validator-set-file /home/pouwelse/libra/das_config/%d/consensus_peers.config.toml " \
-                  "-m /home/pouwelse/libra/terraform/validator-sets/dev/mint.key" % (host, port, validator_peer_id)
+            mint_key_path = os.path.join(self.libra_path, "libra_swarm_config", "mint.key")
+            cmd = "%s/target/release/cli -u http://localhost:%d -m %s --waypoint 0:%s --chain-id 4" % (self.libra_path, 12000 + self.my_id, mint_key_path, self.waypoint_id)
 
             self.faucet_client = pexpect.spawn(cmd)
             self.faucet_client.delaybeforesend = 0.1
             self.faucet_client.logfile = sys.stdout.buffer
-            self.faucet_client.expect("Please, input commands", timeout=3)
+            self.faucet_client.expect("Connected to validator at", timeout=3)
 
             # Also start the HTTP API for the faucet service
             self._logger.info("Starting faucet HTTP API...")
@@ -208,12 +212,12 @@ class LibraModule(BlockchainModule):
             await self.site.start()
 
         if self.is_client():
+            validator_peer_id = (self.my_id - 1) % self.num_validators
+            validator_host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id + 1)
+            validator_port = 12000 + validator_peer_id + 1
             self._logger.info("Spawning client that connects to validator %s (host: %s, port %s)",
-                              validator_peer_id, host, port)
-            self.libra_client = Client.new(host, port,
-                                           os.path.join(self.libra_path, "das_config", "%d" % validator_peer_id,
-                                                        "consensus_peers.config.toml"))
-            self.libra_client.faucet_host = faucet_host + ":8000"
+                              validator_peer_id, validator_host, validator_port)
+            self.diem_client = jsonrpc.Client("http://%s:%d" % (validator_host, validator_port))
 
     @experiment_callback
     def create_accounts(self):
@@ -221,9 +225,8 @@ class LibraModule(BlockchainModule):
             return
 
         self._logger.info("Creating accounts...")
-        self.wallet = libra.WalletLibrary.new()
-        self.wallet.new_account()
-        self.wallet.new_account()
+        self.sender_account = LocalAccount.generate()
+        self.receiver_account = LocalAccount.generate()
 
     @experiment_callback
     async def mint(self):
@@ -236,7 +239,7 @@ class LibraModule(BlockchainModule):
         await sleep(random_wait)
 
         faucet_host, _ = self.experiment.get_peer_ip_port_by_id(1)
-        address = self.wallet.accounts[0].address.hex()
+        address = self.sender_account.auth_key.hex()
 
         async with aiohttp.ClientSession() as session:
             url = "http://" + faucet_host + ":8000/?amount=%d&address=%s" % (1000000, address)
@@ -244,32 +247,36 @@ class LibraModule(BlockchainModule):
 
         print("Mint request performed!")
 
-    @experiment_callback
-    def print_balance(self, account_nr):
-        if not self.is_client():
-            return
-
-        address = self.wallet.accounts[int(account_nr)].address
-        print(self.libra_client.get_balance(address))
+    @staticmethod
+    def create_transaction(sender, sender_account_sequence, script, currency):
+        return diem_types.RawTransaction(
+            sender=sender.account_address,
+            sequence_number=sender_account_sequence,
+            payload=diem_types.TransactionPayload__Script(script),
+            max_gas_amount=1_000_000,
+            gas_unit_price=0,
+            gas_currency_code=currency,
+            expiration_timestamp_secs=int(time.time()) + 30,
+            chain_id=chain_ids.TESTING,
+        )
 
     @experiment_callback
     def transfer(self):
-        receiver_address = self.wallet.accounts[1].address
-        sender_account = self.wallet.accounts[0]
+        amount = 1_000_000
 
-        script = Script.gen_transfer_script(receiver_address, 100)
-        payload = TransactionPayload('Script', script)
-        raw_tx = RawTransaction.new_tx(sender_account.address, self.current_seq_num, payload, 140_000, 0, 100)
-        signed_txn = SignedTransaction.gen_from_raw_txn(raw_tx, sender_account)
-        request = SubmitTransactionRequest()
-        request.transaction.txn_bytes = signed_txn.serialize()
+        script = stdlib.encode_peer_to_peer_with_metadata_script(
+            currency=utils.currency_code(testnet.TEST_CURRENCY_CODE),
+            payee=self.receiver_account.account_address,
+            amount=amount,
+            metadata=b"",  # no requirement for metadata and metadata signature
+            metadata_signature=b"",
+        )
+        txn = LibraModule.create_transaction(self.sender_account, self.current_seq_num, script, testnet.TEST_CURRENCY_CODE)
+
+        signed_txn = self.sender_account.sign(txn)
+        self.diem_client.submit(signed_txn)
+
         submit_time = int(round(time.time() * 1000))
-
-        try:
-            self.libra_client.submit_transaction(request, raw_tx, False)
-        except TransactionError:
-            self._logger.exception("Failed to submit transaction to validator!")
-
         self.tx_info[self.current_seq_num] = (submit_time, -1)
         self.current_seq_num += 1
 
@@ -286,7 +293,7 @@ class LibraModule(BlockchainModule):
         """
         request_time = int(round(time.time() * 1000))
 
-        ledger_seq_num = self.libra_client.get_sequence_number(self.wallet.accounts[0].address)
+        ledger_seq_num = self.diem_client.get_account_sequence(self.sender_account.account_address)
         if ledger_seq_num == 0:
             self._logger.warning("Empty account blob!")
             return
@@ -314,16 +321,11 @@ class LibraModule(BlockchainModule):
 
     @experiment_callback
     async def stop(self):
-        print("Stopping Libra...")
+        print("Stopping Diem...")
         if self.libra_validator_process:
-            self.libra_validator_process.kill()
-        if self.faucet_process:
-            self.faucet_process.kill()
+            os.killpg(os.getpgid(self.libra_validator_process.pid), signal.SIGTERM)
         if self.site:
             await self.site.stop()
 
         loop = get_event_loop()
         loop.stop()
-
-        # Delete the postgres directory
-        shutil.rmtree("libradb", ignore_errors=True)
