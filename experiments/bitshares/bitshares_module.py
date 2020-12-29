@@ -2,6 +2,7 @@ import json
 import os
 import random
 import shutil
+import signal
 import subprocess
 import sys
 from asyncio import get_event_loop
@@ -124,7 +125,7 @@ class BitsharesModule(BlockchainModule):
         genesis_path = os.path.join(self.devnet_dir, "genesis", "my-genesis.json")
         cmd = '%s --genesis-json=%s --data-dir data --partial-operations true > %s 2>&1' \
               % (bitshares_exec, genesis_path, 'bitshares_output.log')
-        self.bs_process = subprocess.Popen([cmd], shell=True)
+        self.bs_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
     def start_cli_wallet(self):
@@ -316,7 +317,7 @@ class BitsharesModule(BlockchainModule):
     def stop(self):
         print("Stopping BitShares...")
         if self.bs_process:
-            self.bs_process.kill()
+            os.killpg(os.getpgid(self.bs_process.pid), signal.SIGTERM)
         if self.dump_blockchain_lc:
             self.dump_blockchain_lc.cancel()
 
