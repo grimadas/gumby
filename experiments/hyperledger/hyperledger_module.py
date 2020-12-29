@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import signal
 import subprocess
 import time
 from asyncio import sleep, get_event_loop, ensure_future
@@ -228,7 +229,7 @@ class HyperledgerModule(BlockchainModule):
 
         # Start the orderer
         cmd = "/home/martijn/hyperledger/orderer > orderer.out 2>&1"
-        self.orderer_process = subprocess.Popen([cmd], shell=True, env=orderer_env)
+        self.orderer_process = subprocess.Popen([cmd], shell=True, env=orderer_env, preexec_fn=os.setsid)
 
     @experiment_callback
     def start_peers(self):
@@ -273,7 +274,7 @@ class HyperledgerModule(BlockchainModule):
 
         # Start the peer
         cmd = "/home/martijn/hyperledger/peer node start > peer.out 2>&1"
-        self.peer_process = subprocess.Popen([cmd], shell=True, env=peer_env)
+        self.peer_process = subprocess.Popen([cmd], shell=True, env=peer_env, preexec_fn=os.setsid)
 
     @experiment_callback
     def generate_client_config(self):
@@ -442,7 +443,7 @@ class HyperledgerModule(BlockchainModule):
               % os.path.join(os.getcwd(), "transactions.txt")
         my_env = os.environ.copy()
         my_env["GOPATH"] = "/home/martijn/gocode"
-        self.monitor_process = subprocess.Popen(cmd, env=my_env, shell=True)
+        self.monitor_process = subprocess.Popen(cmd, env=my_env, shell=True, preexec_fn=os.setsid)
 
         async def get_latest_block_num():
             self._logger.info("Getting latest block nr...")
@@ -501,7 +502,7 @@ class HyperledgerModule(BlockchainModule):
         if self.monitor_lc:
             self.monitor_lc.cancel()
         if self.monitor_process:
-            self.monitor_process.kill()
+            os.killpg(os.getpgid(self.monitor_process.pid), signal.SIGTERM)
 
     @experiment_callback
     def start_client(self):
@@ -548,9 +549,9 @@ class HyperledgerModule(BlockchainModule):
     def stop(self):
         print("Stopping Hyperledger Fabric...")
         if self.orderer_process:
-            self.orderer_process.kill()
+            os.killpg(os.getpgid(self.orderer_process.pid), signal.SIGTERM)
         if self.peer_process:
-            self.peer_process.kill()
+            os.killpg(os.getpgid(self.peer_process.pid), signal.SIGTERM)
 
         loop = get_event_loop()
         loop.stop()
