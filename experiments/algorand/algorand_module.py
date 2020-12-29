@@ -1,6 +1,8 @@
 import hashlib
 import json
 import os
+import signal
+
 import requests
 import shutil
 import subprocess
@@ -119,10 +121,10 @@ class AlgorandModule(BlockchainModule):
         await sleep((self.my_id - 1) * 0.5)
 
         self._logger.info("Starting Algorand node...")
-        self.node_process = subprocess.Popen([cmd], shell=True)
+        self.node_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
         kmd_cmd = "goal kmd start -d %s" % self.get_data_dir(self.my_id)
-        self.kmd_process = subprocess.Popen([kmd_cmd], shell=True)
+        self.kmd_process = subprocess.Popen([kmd_cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
     def start_client(self):
@@ -245,9 +247,9 @@ class AlgorandModule(BlockchainModule):
     def stop_algorand(self):
         self._logger.info("Stopping Algorand...")
         if self.node_process:
-            self.node_process.kill()
+            os.killpg(os.getpgid(self.node_process.pid), signal.SIGTERM)
         if self.kmd_process:
-            self.kmd_process.kill()
+            os.killpg(os.getpgid(self.kmd_process.pid), signal.SIGTERM)
 
     @experiment_callback
     def stop(self):
