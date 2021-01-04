@@ -181,7 +181,7 @@ class EthereumModule(BlockchainModule):
                   "--txpool.globalqueue=20000 > ethereum.out 2>&1" % \
                   (geth_bin_path, pprof_port, rpc_port, ethash_dir, port, self.network_id, host)
         else:
-            start_delay = random.random() * 10
+            start_delay = random.random() * 20
             await sleep(start_delay)
 
             cmd = "%s --datadir data --allow-insecure-unlock --metrics --pprof --pprofport %d --rpc --rpcport %d " \

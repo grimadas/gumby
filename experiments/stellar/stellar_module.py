@@ -2,7 +2,6 @@ import os
 import shutil
 import signal
 
-import aiohttp
 import requests
 import subprocess
 import time
@@ -13,7 +12,7 @@ from urllib.parse import quote_plus
 
 from datetime import datetime
 
-from stellar_sdk import Keypair, TransactionBuilder, AiohttpClient, Server
+from stellar_sdk import Keypair, TransactionBuilder, AiohttpClient, Server, Account, TransactionEnvelope
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
@@ -172,8 +171,9 @@ ADDRESS="%s:%d"
         os.system(cmd)  # Blocking execution
 
         # Publish history
-        self._logger.info("Publish a new history...")
-        os.system("/home/martijn/stellar-core/stellar-core new-hist vs --conf=stellar-core.cfg")
+        if self.my_id == 1:
+            self._logger.info("Publish a new history...")
+            os.system("/home/martijn/stellar-core/stellar-core new-hist vs --conf=stellar-core.cfg")
 
     @experiment_callback
     def start_validators(self):
@@ -183,8 +183,8 @@ ADDRESS="%s:%d"
         if self.is_client():
             return
 
-        cmd = "/home/martijn/stellar-core/stellar-core run 2>&1"
-        self.validator_process = subprocess.Popen([cmd], shell=True, stdout=subprocess.DEVNULL, preexec_fn=os.setsid)
+        cmd = "/home/martijn/stellar-core/stellar-core run > stellar.out 2>&1"
+        self.validator_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
     def start_horizon(self):
@@ -223,9 +223,14 @@ ADDRESS="%s:%d"
             return
 
         self._logger.info("Upgrading tx size limit")
-
         response = requests.get(
             "http://127.0.0.1:%d/upgrades?mode=set&upgradetime=1970-01-01T00:00:00Z&maxtxsize=10000"
+            % (11000 + self.my_id,))
+        self._logger.info("Response: %s", response.text)
+
+        self._logger.info("Upgrading protocol version")
+        response = requests.get(
+            "http://127.0.0.1:%d/upgrades?mode=set&upgradetime=1970-01-01T00:00:00Z&protocolversion=15"
             % (11000 + self.my_id,))
         self._logger.info("Response: %s", response.text)
 
@@ -240,16 +245,19 @@ ADDRESS="%s:%d"
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
         horizon_uri = "http://%s:%d" % (host, 19000 + validator_peer_id)
 
-        async def append_create_account_op(builder, server, root_keypair, receiver_pub_key, amount):
+        async def append_create_account_op(builder, server, root_keypair, root_account, receiver_pub_key, amount):
             builder.append_create_account_op(receiver_pub_key, amount, root_keypair.public_key)
-            if len(builder.operations) == 1:
+            if len(builder.operations) == 100:
                 self._logger.info("Sending create transaction ops...")
                 tx = builder.build()
                 tx.sign(root_keypair)
                 response = await server.submit_transaction(tx)
                 print("Create account response: %s" % response)
 
-                builder = builder.next_builder()
+                builder = TransactionBuilder(
+                    source_account=root_account,
+                    network_passphrase="Standalone Pramati Network ; Oct 2018"
+                )
 
             return builder
 
@@ -264,13 +272,13 @@ ADDRESS="%s:%d"
 
             for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
                 receiver_keypair = Keypair.random()
-                builder = await append_create_account_op(builder, server, root_keypair, receiver_keypair.public_key, "10000000")
+                builder = await append_create_account_op(builder, server, root_keypair, root_account, receiver_keypair.public_key, "10000000")
                 self.experiment.send_message(client_index, b"receive_account_seed", receiver_keypair.secret.encode())
 
                 # Create the sender accounts
                 for account_ind in range(self.num_accounts_per_client):
                     sender_keypair = Keypair.random()
-                    builder = await append_create_account_op(builder, server, root_keypair, sender_keypair.public_key, "10000000")
+                    builder = await append_create_account_op(builder, server, root_keypair, root_account, sender_keypair.public_key, "10000000")
                     self.experiment.send_message(client_index, b"send_account_seed_%d" % account_ind, sender_keypair.secret.encode())
 
             # Send the remaining operations
@@ -285,6 +293,8 @@ ADDRESS="%s:%d"
     async def get_initial_sq_num(self):
         if not self.is_client():
             return
+
+        self._logger.info("Getting initial sequence numbers...")
 
         validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
@@ -319,23 +329,23 @@ ADDRESS="%s:%d"
         self._logger.info("Will transfer from account %d, sq num: %d",
                           source_account_nr, self.sequence_numbers[source_account_nr])
 
-        builder = Builder(secret=self.sender_keypairs[source_account_nr].seed(),
-                          horizon_uri="http://%s:%d" % (host, 19000 + validator_peer_id),
-                          network="Standalone Pramati Network ; Oct 2018",
-                          sequence=self.sequence_numbers[source_account_nr],
-                          fee=100)
-        builder.horizon.request_timeout = 60
+        sender_account = Account(self.sender_keypairs[source_account_nr].public_key, self.sequence_numbers[source_account_nr])
+        builder = TransactionBuilder(
+            source_account=sender_account,
+            network_passphrase="Standalone Pramati Network ; Oct 2018"
+        )
 
-        builder.append_payment_op(self.receiver_keypair.address(), '100', 'XLM')
-        builder.sign()
+        builder.append_payment_op(self.receiver_keypair.public_key, '100', 'XLM')
+        tx = builder.build()
+        tx.sign(self.sender_keypairs[source_account_nr])
 
         self._logger.info("Submitting transaction with id %d", self.sequence_numbers[source_account_nr])
 
         def send_transaction(tx, seq_num, account_nr):
-            tx_id = self.sender_keypairs[source_account_nr].address().decode() + "." + "%d" % seq_num
+            tx_id = self.sender_keypairs[source_account_nr].public_key + "." + "%d" % seq_num
             submit_time = int(round(time.time() * 1000))
             response = requests.get("http://%s:%d/tx?blob=%s"
-                                    % (host, 11000 + validator_peer_id, quote_plus(tx.decode())))
+                                    % (host, 11000 + validator_peer_id, quote_plus(tx)))
             self.account_status[account_nr] = AccountStatus.IDLE
             self._logger.info("Received response for transaction with account %d and id %d: %s",
                               account_nr, seq_num, response.text)
@@ -348,7 +358,7 @@ ADDRESS="%s:%d"
                 self.tx_submit_times[tx_id] = submit_time
 
         t = Thread(target=send_transaction,
-                   args=(builder.gen_xdr(), self.sequence_numbers[source_account_nr], source_account_nr))
+                   args=(tx.to_xdr(), self.sequence_numbers[source_account_nr], source_account_nr))
         t.daemon = True
         t.start()
 
@@ -365,23 +375,12 @@ ADDRESS="%s:%d"
                 tx_submit_times_file.write("%s,%d\n" % (tx_id, submit_time))
 
     @experiment_callback
-    async def print_ledgers(self):
-        if self.is_client():
-            return
-
-        validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
-        host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
-        horizon_uri = "http://%s:%d" % (host, 19000 + validator_peer_id)
-
-        async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
-            print("Ledgers: %s" % server.ledgers())
-
-    @experiment_callback
     def parse_ledgers(self):
         self._logger.info("Parsing ledgers...")
         horizon_url = "http://127.0.0.1:%d" % (19000 + self.my_id)
-        horizon = Horizon(horizon_url)
-        ledgers = horizon.ledgers(limit=100)
+
+        response = requests.get(horizon_url + "/ledgers?limit=100")
+        ledgers = response.json()
         tx_times = {}
         for ledger_info in ledgers["_embedded"]["records"]:
             ledger_sq = ledger_info["sequence"]
@@ -389,14 +388,16 @@ ADDRESS="%s:%d"
             close_time = datetime.fromisoformat(ledger_info["closed_at"].replace("Z", "+00:00")).timestamp() * 1000
 
             # Get the transactions in this ledger
-            transactions = horizon.ledger_transactions(ledger_sq, limit=200, include_failed=True)  # TODO chain requests
+            transactions_url = "%s/ledgers/%d/transactions?limit=200&include_failed=True" % (horizon_url, ledger_sq)
+            response = requests.get(transactions_url)
+            transactions = response.json()
             while True:
                 if not transactions["_embedded"]["records"]:
                     break
 
                 for transaction in transactions["_embedded"]["records"]:
-                    te = TransactionEnvelope.from_xdr(transaction["envelope_xdr"])
-                    tx_id = te.tx.source.decode() + "." + "%d" % (te.tx.sequence - 1)
+                    te = TransactionEnvelope.from_xdr(transaction["envelope_xdr"], "Standalone Pramati Network ; Oct 2018")
+                    tx_id = te.transaction.source.public_key + "." + "%d" % (te.transaction.sequence - 1)
                     tx_times[tx_id] = close_time
 
                 response = requests.get(transactions["_links"]["next"]["href"])
