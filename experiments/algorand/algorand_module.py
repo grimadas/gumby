@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import signal
+from random import sample
 
 import requests
 import shutil
@@ -46,7 +47,7 @@ class AlgorandModule(BlockchainModule):
         self.transactions_manager.transfer = self.transfer
 
     def get_data_dir(self, peer_id):
-        return os.path.join(os.getcwd(), "Node%d" % peer_id)
+        return os.path.join("/tmp/algo_data_%d" % self.num_validators, "Node%d" % peer_id)
 
     def get_rest_token(self, peer_id):
         """
@@ -110,17 +111,18 @@ class AlgorandModule(BlockchainModule):
         if self.is_client():
             return
 
-        if self.my_id == 1:
-            cmd = "goal node start -d %s" % self.get_data_dir(self.my_id)
-        else:
-            ip, _ = self.experiment.get_peer_ip_port_by_id(1)
-            peer_str = "%s:13001" % ip
-            cmd = "goal node start -d %s -p %s" % (self.get_data_dir(self.my_id), peer_str)
+        # Select 10 random peers to bootstrap with
+        peers = list(range(1, self.num_validators + 1))
+        peers.remove(self.my_id)
+        random_peers = sample(peers, min(len(peers), 10))
+        addresses = []
+        for peer_id in random_peers:
+            ip, _ = self.experiment.get_peer_ip_port_by_id(peer_id)
+            addresses.append("%s:%d" % (ip, 13000 + peer_id))
 
-        # Wait a bit, depending on the node number
-        await sleep((self.my_id - 1) * 0.5)
+        cmd = "goal node start -d %s -p \"%s\"" % (self.get_data_dir(self.my_id), ";".join(addresses))
 
-        self._logger.info("Starting Algorand node...")
+        self._logger.info("Starting Algorand node with command: %s", cmd)
         self.node_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
         kmd_cmd = "goal kmd start -d %s" % self.get_data_dir(self.my_id)
@@ -143,41 +145,45 @@ class AlgorandModule(BlockchainModule):
         self.kmd_client = KMDClient(rest_token, "http://%s:%d" % (host, 21000 + validator_peer_id))
 
     @experiment_callback
-    def transfer(self):
+    def prepare_client(self):
         if not self.is_client():
             return
 
-        if not self.suggested_parameters:
-            # get suggested parameters and fee
-            self.suggested_parameters = self.algod_client.suggested_params()
-            self.suggested_parameters["fee"] = 1000  # start with 1000 fee
+        self._logger.info("Fetching initial suggested parameters...")
+        self.suggested_parameters = self.algod_client.suggested_params()
+        self._logger.info("Received suggested parameters")
+        self.suggested_parameters["fee"] = 1000  # start with 1000 fee
+
+        self._logger.info("Fetching wallet info...")
+        self.wallet = Wallet('unencrypted-default-wallet', '', self.kmd_client)
+        wallet_keys = self.wallet.list_keys()
+        self._logger.info("Wallet keys returned: %s", wallet_keys)
+
+        # Determine the 'master' wallet with coins
+        for wallet_key in wallet_keys:
+            balance = self.algod_client.account_info(wallet_key)["amount"]
+            if balance > 0:
+                self._logger.info("Found account %s with balance %d", wallet_key, balance)
+                self.sender_key = wallet_key
+                break
+
+        try:
+            self.receiver_key = self.wallet.generate_key()
+        except KMDHTTPError:
+            self._logger.warning("Failed to generate receiver key!")
+
+        self._logger.info("Sender key: %s", self.sender_key)
+        self._logger.info("Receiver key: %s", self.receiver_key)
+
+    @experiment_callback
+    def transfer(self):
+        if not self.is_client():
+            return
 
         gen = self.suggested_parameters["genesisID"]
         gh = self.suggested_parameters["genesishashb64"]
         last_round = self.suggested_parameters["lastRound"]
         fee = self.suggested_parameters["fee"]
-
-        if not self.wallet:
-            self.wallet = Wallet('unencrypted-default-wallet', '', self.kmd_client)
-            wallet_keys = self.wallet.list_keys()
-
-            # Determine the 'master' wallet with coins
-            for wallet_key in wallet_keys:
-                balance = self.algod_client.account_info(wallet_key)["amount"]
-                if balance > 0:
-                    self._logger.info("Found account %s with balance %d", wallet_key, balance)
-                    self.sender_key = wallet_key
-                    break
-
-        if not self.receiver_key:
-            try:
-                self.receiver_key = self.wallet.generate_key()
-            except KMDHTTPError:
-                self._logger.warning("Failed to generate receiver key - will try again later!")
-                return
-
-            self._logger.info("Sender key: %s", self.sender_key)
-            self._logger.info("Receiver key: %s", self.receiver_key)
 
         def create_and_submit_tx():
             txn = transaction.PaymentTxn(self.sender_key, fee, last_round, last_round + 300, gh,
@@ -186,6 +192,7 @@ class AlgorandModule(BlockchainModule):
             submit_time = int(round(time.time() * 1000))
             try:
                 self.tx_counter += 1
+                self._logger.info("About to submit a transaction (fee: %d)", fee)
                 tx_id = self.algod_client.send_transaction(signed)
                 self.transactions[tx_id] = (submit_time, -1)
                 self._logger.info("Submitted transaction with ID %s (fee: %d)", tx_id, fee)
@@ -210,11 +217,13 @@ class AlgorandModule(BlockchainModule):
 
         validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
 
-        self._logger.info("Starting Algorand client...")
-
         rest_token = self.get_rest_token(validator_peer_id)
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
         response = requests.get("http://%s:%d/metrics" % (host, 18500 + validator_peer_id),
+                                headers={"X-Algo-API-Token": rest_token})
+        print(response.text)
+
+        response = requests.get("http://%s:%d/v2/status" % (host, 18500 + validator_peer_id),
                                 headers={"X-Algo-API-Token": rest_token})
         print(response.text)
 

@@ -22,7 +22,7 @@ def create_network(num_validators, root_dir):
         ]
     }
 
-    stake_per_node = 100 // num_validators
+    stake_per_node = round(100 / num_validators, 3)
     last_node_stake = stake_per_node + 100 - (stake_per_node * num_validators)
 
     for node_ind in range(num_validators):
@@ -38,7 +38,7 @@ def create_network(num_validators, root_dir):
 
         node_info = {
             "Name": "Node%d" % (node_ind + 1),
-            "IsRelay": node_ind == 0,
+            "IsRelay": True,
             "Wallets": [{
                 "Name": wallet_name,
                 "ParticipationOnly": False
