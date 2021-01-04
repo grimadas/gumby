@@ -5,13 +5,11 @@
 @0:1 sync_staking_keys {1}
 @0:5 start_avalanche {1}
 @0:10 start_avalanche {2-1000}
-@0:65 create_keystore_user
-@0:70 share_node_id
-@0:70 import_funds {1}
-@0:70 create_address
-@0:75 transfer_funds_to_others {1}
-@0:100 register_validators {1}
-@0:120 start_creating_transactions
-@0:130 stop_creating_transactions
-@0:140 write_stats
-@0:145 stop
+@0:90 create_keystore_user
+@0:100 share_node_id
+@0:100 import_funds {1}
+@0:100 create_address
+@0:105 transfer_funds_to_others {1}
+@0:130 register_validators {1}
+@0:220 write_stats
+@0:225 stop

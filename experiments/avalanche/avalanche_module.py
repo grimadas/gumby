@@ -58,6 +58,8 @@ class AvalancheModule(BlockchainModule):
         """
         Start an Avalanche node.
         """
+        self._logger.info("This is node %d", self.my_id)
+
         if self.is_client():
             return
 
@@ -85,7 +87,7 @@ class AvalancheModule(BlockchainModule):
                   "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
                   (my_host, http_port, staking_port, self.my_id, bootstrap_host, self.my_id, self.my_id)
 
-            await sleep(random.random() * 5)
+            await sleep(random.random() * 10)
             self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
@@ -269,7 +271,7 @@ class AvalancheModule(BlockchainModule):
             tx_id = response["result"]["txID"]
             tx_ids.append(tx_id)
 
-            await sleep(1)
+            await sleep(0.15)
 
         await sleep(15)
 
