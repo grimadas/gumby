@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import shutil
 import signal
 import subprocess
@@ -153,52 +154,56 @@ class HyperledgerModule(BlockchainModule):
         if self.is_client():
             return
 
-        os.mkdir("peer_data")
-        os.mkdir("orderer_data")
+        data_dir = os.path.join("/tmp", "hyperledger_data", "%d" % self.my_id)
+        shutil.rmtree(data_dir, ignore_errors=True)
+        os.makedirs(data_dir, exist_ok=True)
+        os.mkdir(os.path.join(data_dir, "peer_data"))
+        os.mkdir(os.path.join(data_dir, "orderer_data"))
 
-        shutil.copyfile(os.path.join(self.config_path, "core.yaml"), os.path.join("peer_data", "core.yaml"))
-        shutil.copyfile(os.path.join(self.config_path, "core.yaml"), os.path.join("orderer_data", "core.yaml"))
-        shutil.copyfile(os.path.join(self.config_path, "orderer.yaml"), os.path.join("orderer_data", "orderer.yaml"))
+        shutil.copyfile(os.path.join(self.config_path, "core.yaml"), os.path.join(data_dir, "peer_data", "core.yaml"))
+        shutil.copyfile(os.path.join(self.config_path, "core.yaml"), os.path.join(data_dir, "orderer_data", "core.yaml"))
+        shutil.copyfile(os.path.join(self.config_path, "orderer.yaml"), os.path.join(data_dir, "orderer_data", "orderer.yaml"))
 
         # Copy the orderer directory
         orderer_data_path = os.path.join(self.config_path, "crypto-config", "ordererOrganizations", "example.com",
                                          "orderers", "orderer%d.example.com" % self.my_id)
-        shutil.copytree(os.path.join(orderer_data_path, "msp"), os.path.join("orderer_data", "msp"))
-        shutil.copytree(os.path.join(orderer_data_path, "tls"), os.path.join("orderer_data", "tls"))
+        shutil.copytree(os.path.join(orderer_data_path, "msp"), os.path.join(data_dir, "orderer_data", "msp"))
+        shutil.copytree(os.path.join(orderer_data_path, "tls"), os.path.join(data_dir, "orderer_data", "tls"))
 
         # Copy the peer directory
         peer_data_path = os.path.join(self.config_path, "crypto-config", "peerOrganizations",
                                       "org%d.example.com" % self.my_id, "peers", "peer0.org%d.example.com" % self.my_id)
-        shutil.copytree(os.path.join(peer_data_path, "msp"), os.path.join("peer_data", "msp"))
-        shutil.copytree(os.path.join(peer_data_path, "tls"), os.path.join("peer_data", "tls"))
+        shutil.copytree(os.path.join(peer_data_path, "msp"), os.path.join(data_dir, "peer_data", "msp"))
+        shutil.copytree(os.path.join(peer_data_path, "tls"), os.path.join(data_dir, "peer_data", "tls"))
 
         # Change paths in peer/orderer files
         yaml = YAML()
-        with open(os.path.join("peer_data", "core.yaml"), "r") as core_config_file:
+        with open(os.path.join(data_dir, "peer_data", "core.yaml"), "r") as core_config_file:
             config = yaml.load(core_config_file)
 
-        config["peer"]["fileSystemPath"] = os.path.join(os.getcwd(), "peer_data")
+        config["peer"]["fileSystemPath"] = os.path.join(data_dir, "peer_data")
 
-        with open(os.path.join("peer_data", "core.yaml"), "w") as core_config_file:
+        with open(os.path.join(data_dir, "peer_data", "core.yaml"), "w") as core_config_file:
             yaml.dump(config, core_config_file)
 
         yaml = YAML()
-        with open(os.path.join("orderer_data", "orderer.yaml"), "r") as orderer_config_file:
+        with open(os.path.join(data_dir, "orderer_data", "orderer.yaml"), "r") as orderer_config_file:
             config = yaml.load(orderer_config_file)
 
-        config["FileLedger"]["Location"] = os.path.join(os.getcwd(), "orderer_data")
-        config["Consensus"]["WALDir"] = os.path.join(os.getcwd(), "orderer_data", "etcdraft", "wal")
-        config["Consensus"]["SnapDir"] = os.path.join(os.getcwd(), "orderer_data", "etcdraft", "snapshot")
+        config["FileLedger"]["Location"] = os.path.join(data_dir, "orderer_data")
+        config["Consensus"]["WALDir"] = os.path.join(data_dir, "orderer_data", "etcdraft", "wal")
+        config["Consensus"]["SnapDir"] = os.path.join(data_dir, "orderer_data", "etcdraft", "snapshot")
 
-        with open(os.path.join("orderer_data", "orderer.yaml"), "w") as orderer_config_file:
+        with open(os.path.join(data_dir, "orderer_data", "orderer.yaml"), "w") as orderer_config_file:
             yaml.dump(config, orderer_config_file)
 
     @experiment_callback
-    def start_orderers(self):
+    async def start_orderers(self):
         if self.is_client():
             return
 
-        orderer_data_path = os.path.join(os.getcwd(), "orderer_data")
+        data_dir = os.path.join("/tmp", "hyperledger_data", "%d" % self.my_id)
+        orderer_data_path = os.path.join(data_dir, "orderer_data")
         orderer_tls_dir = os.path.join(orderer_data_path, "tls")
         orderer_port = 7000 + self.my_id
 
@@ -227,18 +232,21 @@ class HyperledgerModule(BlockchainModule):
         }
         orderer_env.update(orderer_vars)
 
+        await sleep(random.random() * 10)
+
         # Start the orderer
         cmd = "/home/martijn/hyperledger/orderer > orderer.out 2>&1"
         self.orderer_process = subprocess.Popen([cmd], shell=True, env=orderer_env, preexec_fn=os.setsid)
 
     @experiment_callback
-    def start_peers(self):
+    async def start_peers(self):
         if self.is_client():
             return
 
         host, _ = self.experiment.get_peer_ip_port_by_id(self.my_id)
 
-        peer_data_path = os.path.join(os.getcwd(), "peer_data")
+        data_dir = os.path.join("/tmp", "hyperledger_data", "%d" % self.my_id)
+        peer_data_path = os.path.join(data_dir, "peer_data")
         peer_tls_dir = os.path.join(peer_data_path, "tls")
 
         peer_port = 8000 + self.my_id
@@ -271,6 +279,8 @@ class HyperledgerModule(BlockchainModule):
             "CORE_PEER_TLS_ROOTCERT_FILE": os.path.join(peer_tls_dir, "ca.crt")
         }
         peer_env.update(peer_vars)
+
+        await sleep(random.random() * 10)
 
         # Start the peer
         cmd = "/home/martijn/hyperledger/peer node start > peer.out 2>&1"
@@ -368,7 +378,7 @@ class HyperledgerModule(BlockchainModule):
         os.system(os.path.join(self.config_path, "generate.sh"))
 
     @experiment_callback
-    async def deploy_chaincode(self):
+    async def create_channel(self):
         """
         Create the channel, add peers and instantiate chaincode.
         """
@@ -379,7 +389,6 @@ class HyperledgerModule(BlockchainModule):
         self.fabric_client = Client(net_profile=network_file_path)
 
         org1_admin = self.fabric_client.get_user(org_name='org1.example.com', name='Admin')
-        chaincode_version = 'v6'
 
         # Create a New Channel, the response should be true if succeed
         response = await self.fabric_client.channel_create(
@@ -390,7 +399,9 @@ class HyperledgerModule(BlockchainModule):
         )
         self._logger.info("Result of channel creation: %s", response)
 
-        await sleep(3)
+    @experiment_callback
+    async def deploy_chaincode(self):
+        chaincode_version = 'v6'
 
         # Join Peers into Channel
         for peer_index in range(1, len(self.fabric_client.peers) + 1):
