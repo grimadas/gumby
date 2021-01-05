@@ -10,12 +10,12 @@
 @0:30 start_orderers
 @0:30 start_peers
 @0:55 create_channel {1}
-@0:80 deploy_chaincode {1}
-@0:105 start_monitor {1}
-@0:105 start_client
-@0:110 start_creating_transactions
-@0:130 stop_creating_transactions
-@0:135 stop_monitor {1}
-@0:136 parse_blockchain {1}
-@0:136 write_stats
-@0:145 stop
+@0:85 deploy_chaincode {1}
+@0:135 start_monitor {1}
+@0:135 start_client
+@0:140 start_creating_transactions
+@0:160 stop_creating_transactions
+@0:165 stop_monitor {1}
+@0:166 parse_blockchain {1}
+@0:166 write_stats
+@0:175 stop

@@ -402,6 +402,7 @@ class HyperledgerModule(BlockchainModule):
     @experiment_callback
     async def deploy_chaincode(self):
         chaincode_version = 'v6'
+        org1_admin = self.fabric_client.get_user(org_name='org1.example.com', name='Admin')
 
         # Join Peers into Channel
         for peer_index in range(1, len(self.fabric_client.peers) + 1):
