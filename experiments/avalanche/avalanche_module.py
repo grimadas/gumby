@@ -230,8 +230,6 @@ class AvalancheModule(BlockchainModule):
         self._logger.info("Import funds response: %s", response)
         staking_address = response["result"]["address"]
 
-        tx_ids = []
-
         for validator_id, node_id in self.node_ids.items():
             # Create a reward address
             payload = {
@@ -269,26 +267,24 @@ class AvalancheModule(BlockchainModule):
             response = requests.post("http://localhost:%d/ext/P" % (12000 + self.my_id), json=payload).json()
             self._logger.info("Add validator response: %s", response)
             tx_id = response["result"]["txID"]
-            tx_ids.append(tx_id)
 
-            await sleep(0.15)
+            while True:
+                self._logger.info("Getting status of validator tx (%d)" % validator_id)
+                payload = {
+                    "method": "platform.getTxStatus",
+                    "params": [{
+                        "txID": tx_id,
+                        "includeReason": True,
+                    }],
+                    "jsonrpc": "2.0",
+                    "id": 0,
+                }
 
-        await sleep(15)
-
-        for tx_id in tx_ids:
-            self._logger.info("Getting status of validator tx")
-            payload = {
-                "method": "platform.getTxStatus",
-                "params": [{
-                    "txID": tx_id,
-                    "includeReason": True,
-                }],
-                "jsonrpc": "2.0",
-                "id": 0,
-            }
-
-            response = requests.post("http://localhost:%d/ext/P" % (12000 + self.my_id), json=payload).json()
-            self._logger.info("Validator tx status: %s", response)
+                response = requests.post("http://localhost:%d/ext/P" % (12000 + self.my_id), json=payload).json()
+                self._logger.info("Validator tx status: %s", response)
+                if response["result"]["status"] == "Committed":
+                    break
+                await sleep(0.1)
 
     @experiment_callback
     def transfer(self):
@@ -351,6 +347,21 @@ class AvalancheModule(BlockchainModule):
                     tx_file.write("%s,%d,%d\n" % (tx_id, tx_info[0], tx_info[1]))
 
             return
+
+        # Write the addresses managed by this user
+        payload = {
+            "method": "platform.listAddresses",
+            "params": [{
+                "username": "peer%d" % self.my_id,
+                "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
+            }],
+            "jsonrpc": "2.0",
+            "id": 0,
+        }
+
+        response = requests.post("http://localhost:%d/ext/bc/P" % (12000 + self.my_id), json=payload).json()
+        with open("addresses.txt", "w") as addresses_file:
+            addresses_file.write(json.dumps(response["result"]["addresses"]))
 
         # Write the balance
         payload = {
