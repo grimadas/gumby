@@ -56,38 +56,12 @@ class LibraModule(BlockchainModule):
         self.transactions_manager.transfer = self.transfer
 
     @experiment_callback
-    async def generate_config(self):
-        """
-        Generate the initial configuration files.
-        """
-        self._logger.info("Generating config...")
-
-        # Step 1: remove configuration from previous run
-        shutil.rmtree("%s/libra_swarm_config" % self.libra_path, ignore_errors=True)
-
-        # Step 2: generate new configuration
-        cmd = "%s/target/release/diem-swarm -n %d --diem-node %s/target/release/diem-node -c %s/libra_swarm_config > genconfig.out 2>&1" % \
-              (self.libra_path, self.num_validators, self.libra_path, self.libra_path)
-        config_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
-        await sleep(10)
-        os.killpg(os.getpgid(config_process.pid), signal.SIGTERM)
-
-        self._logger.info("Sharing config to other validators...")
-
-        my_host, _ = self.experiment.get_peer_ip_port_by_id(self.experiment.my_id)
-        other_hosts = set()
-        for peer_id in self.experiment.all_vars.keys():
-            host = self.experiment.all_vars[peer_id]['host']
-            if host not in other_hosts and host != my_host:
-                other_hosts.add(host)
-                self._logger.info("Syncing configuration with host %s", host)
-                os.system("rsync -r --delete /home/martijn/diem/libra_swarm_config martijn@%s:/home/martijn/diem/" % host)
-
-    @experiment_callback
     def init_config(self):
         """
         Initialize the configuration. In particular, make sure the addresses of the seed nodes are correctly set.
         """
+        diem_config_root_dir = os.path.join("/tmp", "diem_data_%d" % self.num_validators)
+
         self.validator_id = self.my_id - 1
         if self.is_client():
             return
@@ -98,14 +72,13 @@ class LibraModule(BlockchainModule):
             self._logger.info("Reading initial config of validator %d...", validator_id)
 
             yaml = YAML()
-            with open(os.path.join(self.libra_path, "libra_swarm_config", "%d" % validator_id,
-                                   "node.yaml"), "r") as node_config_file:
+            with open(os.path.join(diem_config_root_dir, "%d" % validator_id, "node.yaml"), "r") as node_config_file:
                 node_config = yaml.load(node_config_file)
 
             old_validator_network_listen_address = node_config["validator_network"]["listen_address"]
             old_validator_network_listen_port = int(old_validator_network_listen_address.split("/")[-1])
 
-            log_path = os.path.join(self.libra_path, "libra_swarm_config", "logs", "%d.log" % validator_id)
+            log_path = os.path.join(diem_config_root_dir, "logs", "%d.log" % validator_id)
             with open(log_path, "r") as log_file:
                 for line in log_file.readlines():
                     if "Start listening for incoming connections on" in line:
@@ -128,15 +101,15 @@ class LibraModule(BlockchainModule):
                             self.validator_network_ids[validator_id] = full_network_string
                             break
 
-                    if "Genesis calculated" in line and not self.waypoint_id:
-                        self.waypoint_id = line[-68:-4]
-                        self._logger.info("Waypoint ID: %s", self.waypoint_id)
+        # Get the waypoint ID
+        with open(os.path.join(diem_config_root_dir, "waypoint")) as wp_file:
+            self.waypoint_id = wp_file.read()
+            self._logger.info("Waypoint ID: %s", self.waypoint_id)
 
         self._logger.info("Modifying configuration file...")
 
         yaml = YAML()
-        with open(os.path.join(self.libra_path, "libra_swarm_config", "%d" % self.validator_id,
-                               "node.yaml"), "r") as node_config_file:
+        with open(os.path.join(diem_config_root_dir, "%d" % self.validator_id, "node.yaml"), "r") as node_config_file:
             node_config = yaml.load(node_config_file)
 
         node_config["mempool"]["capacity_per_user"] = 10000
@@ -149,8 +122,7 @@ class LibraModule(BlockchainModule):
                 continue
             node_config["validator_network"]["seed_addrs"][self.peer_ids[validator_id]] = [network_string]
 
-        with open(os.path.join(self.libra_path, "libra_swarm_config", "%d" % self.validator_id,
-                               "node.yaml"), "w") as crypto_config_file:
+        with open(os.path.join(diem_config_root_dir, "%d" % self.validator_id, "node.yaml"), "w") as crypto_config_file:
             yaml.dump(node_config, crypto_config_file)
 
     @experiment_callback
@@ -161,7 +133,8 @@ class LibraModule(BlockchainModule):
 
         self._logger.info("Starting libra validator with id %s...", self.validator_id)
         libra_exec_path = os.path.join(self.libra_path, "target", "release", "diem-node")
-        config_path = os.path.join(self.libra_path, "libra_swarm_config", "%d" % self.validator_id, "node.yaml")
+        diem_config_root_dir = os.path.join("/tmp", "diem_data_%d" % self.num_validators)
+        config_path = os.path.join(diem_config_root_dir, "%d" % self.validator_id, "node.yaml")
 
         cmd = '%s -f %s > %s 2>&1' % (libra_exec_path, config_path, os.path.join(os.getcwd(), 'diem_output.log'))
         self.libra_validator_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
@@ -181,7 +154,7 @@ class LibraModule(BlockchainModule):
             return web.Response(text="Exceeded max amount of {}".format(MAX_MINT / (10 ** 6)), status=400)
 
         self.faucet_client.sendline("a m {} {} XUS".format(address, amount / (10 ** 6)))
-        self.faucet_client.expect("Finished sending coins from faucet!", timeout=3)
+        self.faucet_client.expect("Finished sending coins from faucet!", timeout=20)
 
         return web.Response(text="done")
 
@@ -192,7 +165,7 @@ class LibraModule(BlockchainModule):
 
         if self.my_id == 1:
             # Start the minting service
-            mint_key_path = os.path.join(self.libra_path, "libra_swarm_config", "mint.key")
+            mint_key_path = os.path.join("/tmp", "diem_data_%d" % self.num_validators, "mint.key")
             cmd = "%s/target/release/cli -u http://localhost:%d -m %s --waypoint 0:%s --chain-id 4" % (self.libra_path, 12000 + self.my_id, mint_key_path, self.waypoint_id)
 
             self.faucet_client = pexpect.spawn(cmd)
@@ -234,7 +207,7 @@ class LibraModule(BlockchainModule):
             return
 
         client_id = self.my_id - self.num_validators
-        random_wait = 10 / self.num_clients * client_id
+        random_wait = 20 / self.num_clients * client_id
 
         await sleep(random_wait)
 
