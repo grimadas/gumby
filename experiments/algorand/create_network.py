@@ -23,11 +23,15 @@ def create_network(num_validators, root_dir):
     }
 
     stake_per_node = round(100 / num_validators, 3)
-    last_node_stake = stake_per_node + 100 - (stake_per_node * num_validators)
+    print("Stake per node: %s" % stake_per_node)
+    last_node_stake = round(100 - (stake_per_node * num_validators), 3)
+    print("Last node stake: %s" % last_node_stake)
 
-    for node_ind in range(num_validators):
+    total_stake = 0
+    for node_ind in range(num_validators + 1):
         wallet_name = "Wallet%d" % (node_ind + 1)
         stake = stake_per_node if node_ind != (num_validators - 1) else last_node_stake
+        total_stake += stake
 
         wallet_info = {
             "Name": wallet_name,
@@ -45,6 +49,8 @@ def create_network(num_validators, root_dir):
             }]
         }
         genesis["Nodes"].append(node_info)
+
+    print("Total stake: %s" % total_stake)
 
     with open("genesis.json", "w") as genesis_file:
         genesis_file.write(json.dumps(genesis))
