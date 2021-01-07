@@ -25,6 +25,7 @@ class AvalancheModule(BlockchainModule):
         self.avax_address = None
         self.avax_addresses = {}
         self.node_ids = {}
+        self.bootstrap_node_ids = {}
         self.transactions = {}
         self.experiment.message_callback = self
 
@@ -38,7 +39,9 @@ class AvalancheModule(BlockchainModule):
             avax_address = msg.decode()
             self.avax_addresses[from_id] = avax_address
         elif msg_type == b"node_id":
-            self.node_ids[from_id] = msg.decode()
+            self.node_ids[from_id] = "NodeID-%s" % msg.decode()
+        elif msg_type == b"bootstrap_node_id":
+            self.bootstrap_node_ids[from_id] = "NodeID-%s" % msg.decode()
 
     @experiment_callback
     def sync_staking_keys(self):
@@ -54,6 +57,44 @@ class AvalancheModule(BlockchainModule):
                 os.system("rsync -r --delete /home/martijn/avalanche/staking martijn@%s:/home/martijn/avalanche" % host)
 
     @experiment_callback
+    async def share_node_id(self):
+        """
+        Start avalanche for one second and get the node ID from the log. Then share it with other nodes.
+        """
+        http_port = 12000 + self.my_id
+        staking_port = 14000 + self.my_id
+        my_host, _ = self.experiment.get_peer_ip_port_by_id(self.my_id)
+
+        cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=2 --snow-quorum-size=2 " \
+              "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
+              "--network-id=local --bootstrap-ips= " \
+              "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker%d.crt --plugin-dir=/home/martijn/avalanche/plugins " \
+              "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
+              (my_host, http_port, staking_port, self.my_id, self.my_id, self.my_id)
+
+        avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        await sleep(2)
+        os.killpg(os.getpgid(avalanche_process.pid), signal.SIGTERM)
+
+        # Read the Avalanche log and extract the node ID
+        node_id = None
+        with open("avalanche.out") as ava_log_file:
+            for line in ava_log_file.readlines():
+                if "Set node's ID to" in line:
+                    node_id = line.split(" ")[-1]
+
+        # Select 10 random peers that bootstrap with this peer
+        peers = list(range(1, self.num_validators + 1))
+        peers.remove(self.my_id)
+        random_peers = random.sample(peers, min(len(peers), 10))
+        for peer_id in random_peers:
+            self.experiment.send_message(peer_id, b"bootstrap_node_id", node_id.encode())
+
+        if self.my_id > 5:
+            # Also share the node ID with node 1
+            self.experiment.send_message(1, b"node_id", node_id.encode())
+
+    @experiment_callback
     async def start_avalanche(self):
         """
         Start an Avalanche node.
@@ -66,29 +107,24 @@ class AvalancheModule(BlockchainModule):
         http_port = 12000 + self.my_id
         staking_port = 14000 + self.my_id
         my_host, _ = self.experiment.get_peer_ip_port_by_id(self.my_id)
-        bootstrap_host, _ = self.experiment.get_peer_ip_port_by_id(1)
 
-        self._logger.info("Starting Avalanche...")
+        # Construct the list with bootstrap IPs
+        bootstrap_ips = []
+        bootstrap_ids = []
+        for bootstrap_peer_id, bootstrap_node_id in self.bootstrap_node_ids.items():
+            host, _ = self.experiment.get_peer_ip_port_by_id(bootstrap_peer_id)
+            bootstrap_ips.append("%s:%d" % (host, 14000 + bootstrap_peer_id))
+            bootstrap_ids.append(bootstrap_node_id)
 
-        if self.my_id == 1:  # Bootstrap node
-            cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=2 --snow-quorum-size=2 " \
-                  "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node1 --staking-enabled=true " \
-                  "--network-id=local --bootstrap-ips= " \
-                  "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker1.crt --plugin-dir=/home/martijn/avalanche/plugins " \
-                  "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker1.key > avalanche.out" % \
-                  (my_host, http_port, staking_port)
-            self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
-        else:
-            cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=2 --snow-quorum-size=2 " \
-                  "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
-                  "--network-id=local --bootstrap-ips=%s:14001 " \
-                  "--bootstrap-ids=NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg " \
-                  "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker%d.crt --plugin-dir=/home/martijn/avalanche/plugins " \
-                  "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
-                  (my_host, http_port, staking_port, self.my_id, bootstrap_host, self.my_id, self.my_id)
+        cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=2 --snow-quorum-size=2 " \
+              "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
+              "--network-id=local --bootstrap-ips=%s --bootstrap-ids=%s " \
+              "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker%d.crt --plugin-dir=/home/martijn/avalanche/plugins " \
+              "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
+              (my_host, http_port, staking_port, self.my_id, ",".join(bootstrap_ips), ",".join(bootstrap_ids), self.my_id, self.my_id)
+        self._logger.info("Starting Avalanche with command: %s...", cmd)
 
-            await sleep(random.random() * 10)
-            self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
     def create_keystore_user(self):
@@ -162,25 +198,6 @@ class AvalancheModule(BlockchainModule):
         # Send the address to the clients
         for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
             self.experiment.send_message(client_index, b"avax_address", self.avax_address.encode())
-
-    @experiment_callback
-    def share_node_id(self):
-        if self.is_client() or self.my_id <= 5:
-            return
-
-        self._logger.info("Sharing node ID with bootstrap peer")
-
-        # Get the node ID
-        payload = {
-            "method": "info.getNodeID",
-            "params": [{}],
-            "jsonrpc": "2.0",
-            "id": 0,
-        }
-
-        response = requests.post("http://localhost:%d/ext/info" % (12000 + self.my_id), json=payload).json()
-        node_id = response["result"]["nodeID"]
-        self.experiment.send_message(1, b"node_id", node_id.encode())
 
     @experiment_callback
     async def transfer_funds_to_others(self):
@@ -330,6 +347,9 @@ class AvalancheModule(BlockchainModule):
                 if response["result"]["status"] == "Accepted":
                     confirm_time = int(round(time.time() * 1000))
                     self.transactions[tx_id] = (self.transactions[tx_id][0], confirm_time)
+                    break
+                elif response["result"]["status"] == "Dropped":
+                    self._logger.info("Transaction %s dropped!", tx_id)
                     break
 
                 time.sleep(0.5)

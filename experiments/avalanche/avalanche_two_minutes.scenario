@@ -3,15 +3,14 @@
 &module experiments.avalanche.avalanche_module.AvalancheModule
 
 @0:1 sync_staking_keys {1}
-@0:5 start_avalanche {1}
-@0:10 start_avalanche {2-1000}
-@0:35 create_keystore_user
-@0:40 share_node_id
-@0:40 import_funds {1}
-@0:180 register_validators {1}
-@0:270 create_address
-@0:275 transfer_funds_to_others {1}
-@0:300 start_creating_transactions
-@0:420 stop_creating_transactions
-@0:480 write_stats
-@0:485 stop
+@0:5 share_node_id
+@0:10 start_avalanche
+@0:25 create_keystore_user
+@0:35 import_funds {1}
+@0:90 create_address
+@0:100 register_validators {1}
+@0:100 transfer_funds_to_others {1}
+@0:220 start_creating_transactions
+@0:340 stop_creating_transactions
+@0:400 write_stats
+@0:410 stop
