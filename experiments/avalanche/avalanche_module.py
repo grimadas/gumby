@@ -395,7 +395,7 @@ class AvalancheModule(BlockchainModule):
     def stop(self):
         if self.avalanche_process:
             self._logger.info("Stopping Avalanche...")
-            os.killpg(os.getpgid(self.avalanche_process.pid), signal.SIGTERM)
+            os.killpg(os.getpgid(self.avalanche_process.pid), signal.SIGKILL)
 
         loop = get_event_loop()
         loop.stop()
