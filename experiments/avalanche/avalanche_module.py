@@ -9,6 +9,7 @@ from asyncio import get_event_loop, sleep
 from binascii import hexlify
 from threading import Thread
 
+import psutil
 import requests
 
 from gumby.experiment import experiment_callback
@@ -413,9 +414,19 @@ class AvalancheModule(BlockchainModule):
 
     @experiment_callback
     def stop(self):
+        def kill(proc_pid):
+            process = psutil.Process(proc_pid)
+            for proc in process.children(recursive=True):
+                proc.kill()
+            process.kill()
+
         if self.avalanche_process:
             self._logger.info("Stopping Avalanche...")
-            os.killpg(os.getpgid(self.avalanche_process.pid), signal.SIGKILL)
+            kill(self.avalanche_process.pid)
+
+            # Since Avalanche does not obey my commands...
+            os.system("pkill -f avalanche")
+            os.system("pkill -f evm")
 
         loop = get_event_loop()
         loop.stop()
