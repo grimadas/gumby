@@ -81,7 +81,7 @@ class AvalancheModule(BlockchainModule):
 
         avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
         await sleep(2)
-        os.killpg(os.getpgid(avalanche_process.pid), signal.SIGTERM)
+        os.killpg(os.getpgid(avalanche_process.pid), signal.SIGKILL)
 
         # Read the Avalanche log and extract the node ID
         node_id = None
@@ -425,7 +425,7 @@ class AvalancheModule(BlockchainModule):
             validators_file.write(json.dumps(response["result"]))
 
     @experiment_callback
-    def stop(self):
+    async def stop(self):
         def kill(proc_pid):
             process = psutil.Process(proc_pid)
             for proc in process.children(recursive=True):
@@ -435,6 +435,18 @@ class AvalancheModule(BlockchainModule):
         if self.avalanche_process:
             self._logger.info("Stopping Avalanche...")
             kill(self.avalanche_process.pid)
+
+            # Since Avalanche does not obey my commands...
+            os.system("pkill -f avalanche")
+            os.system("pkill -f evm")
+
+            await sleep(5)
+
+            # Since Avalanche does not obey my commands...
+            os.system("pkill -f avalanche")
+            os.system("pkill -f evm")
+
+            await sleep(5)
 
             # Since Avalanche does not obey my commands...
             os.system("pkill -f avalanche")
