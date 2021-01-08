@@ -7,10 +7,8 @@
 @0:10 start_avalanche
 @0:25 create_keystore_user
 @0:35 import_funds {1}
-@0:90 create_address
-@0:100 register_validators {1}
-@0:100 transfer_funds_to_others {1}
-@0:220 start_creating_transactions
-@0:230 stop_creating_transactions
-@0:250 write_stats
-@0:260 stop
+@0:80 create_address
+@0:90 register_validators {1}
+@0:90 transfer_funds_to_others {1}
+@0:140 write_stats
+@0:150 stop

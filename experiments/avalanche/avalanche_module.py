@@ -407,6 +407,7 @@ class AvalancheModule(BlockchainModule):
             "id": 0,
         }
 
+        self._logger.info("Requesting balances...")
         response = requests.post("http://localhost:%d/ext/bc/X" % (12000 + self.my_id), json=payload).json()
         self._logger.info("Request balance response: %s" % response)
         with open("balance.txt", "w") as balance_file:
@@ -420,6 +421,7 @@ class AvalancheModule(BlockchainModule):
             "id": 0,
         }
 
+        self._logger.info("Requesting validators...")
         response = requests.post("http://localhost:%d/ext/P" % (12000 + self.my_id), json=payload).json()
         with open("validators.txt", "w") as validators_file:
             validators_file.write(json.dumps(response["result"]))
@@ -437,19 +439,19 @@ class AvalancheModule(BlockchainModule):
             kill(self.avalanche_process.pid)
 
             # Since Avalanche does not obey my commands...
-            os.system("pkill -f avalanche")
+            os.system("pkill -f avalanchego")
             os.system("pkill -f evm")
 
             await sleep(5)
 
             # Since Avalanche does not obey my commands...
-            os.system("pkill -f avalanche")
+            os.system("pkill -f avalanchego")
             os.system("pkill -f evm")
 
             await sleep(5)
 
             # Since Avalanche does not obey my commands...
-            os.system("pkill -f avalanche")
+            os.system("pkill -f avalanchego")
             os.system("pkill -f evm")
 
         loop = get_event_loop()
