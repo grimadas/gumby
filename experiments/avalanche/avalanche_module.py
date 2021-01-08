@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import random
+import shutil
 import signal
 import subprocess
 import time
@@ -82,6 +83,9 @@ class AvalancheModule(BlockchainModule):
         avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
         await sleep(2)
         os.killpg(os.getpgid(avalanche_process.pid), signal.SIGKILL)
+
+        # Reset the database
+        shutil.rmtree("db/node%d" % self.my_id)
 
         # Read the Avalanche log and extract the node ID
         node_id = None
