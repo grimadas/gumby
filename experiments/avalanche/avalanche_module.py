@@ -75,7 +75,7 @@ class AvalancheModule(BlockchainModule):
 
         cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=%d --snow-quorum-size=%d " \
               "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
-              "--network-id=local --bootstrap-ips= " \
+              "--network-id=local --bootstrap-ips= conn-meter-max-conns=0 " \
               "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker%d.crt --plugin-dir=/home/martijn/avalanche/plugins " \
               "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
               (my_host, snow_sample_size, snow_quorum_size, http_port, staking_port, self.my_id, self.my_id, self.my_id)
@@ -132,7 +132,7 @@ class AvalancheModule(BlockchainModule):
 
         cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=%d --snow-quorum-size=%d " \
               "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
-              "--network-id=local --bootstrap-ips=%s --bootstrap-ids=%s " \
+              "--network-id=local --bootstrap-ips=%s --bootstrap-ids=%s conn-meter-max-conns=0 " \
               "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker%d.crt --plugin-dir=/home/martijn/avalanche/plugins " \
               "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
               (my_host, snow_sample_size, snow_quorum_size, http_port, staking_port, self.my_id, ",".join(bootstrap_ips), ",".join(bootstrap_ids), self.my_id, self.my_id)
