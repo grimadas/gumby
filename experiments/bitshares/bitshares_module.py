@@ -317,7 +317,7 @@ class BitsharesModule(BlockchainModule):
     def stop(self):
         print("Stopping BitShares...")
         if self.bs_process:
-            os.killpg(os.getpgid(self.bs_process.pid), signal.SIGTERM)
+            os.killpg(os.getpgid(self.bs_process.pid), signal.SIGKILL)
         if self.dump_blockchain_lc:
             self.dump_blockchain_lc.cancel()
 
