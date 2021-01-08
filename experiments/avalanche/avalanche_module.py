@@ -62,6 +62,9 @@ class AvalancheModule(BlockchainModule):
         """
         Start avalanche for one second and get the node ID from the log. Then share it with other nodes.
         """
+        if self.is_client():
+            return
+
         http_port = 12000 + self.my_id
         staking_port = 14000 + self.my_id
         my_host, _ = self.experiment.get_peer_ip_port_by_id(self.my_id)
