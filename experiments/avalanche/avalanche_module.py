@@ -123,12 +123,15 @@ class AvalancheModule(BlockchainModule):
             bootstrap_ips.append("%s:%d" % (host, 14000 + bootstrap_peer_id))
             bootstrap_ids.append(bootstrap_node_id)
 
-        cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=2 --snow-quorum-size=2 " \
+        snow_sample_size = min(20, self.num_validators / 2)
+        snow_quorum_size = min(14, self.num_validators / 2)
+
+        cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=%d --snow-quorum-size=%d " \
               "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
               "--network-id=local --bootstrap-ips=%s --bootstrap-ids=%s " \
               "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker%d.crt --plugin-dir=/home/martijn/avalanche/plugins " \
               "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
-              (my_host, http_port, staking_port, self.my_id, ",".join(bootstrap_ips), ",".join(bootstrap_ids), self.my_id, self.my_id)
+              (my_host, snow_sample_size, snow_quorum_size, http_port, staking_port, self.my_id, ",".join(bootstrap_ips), ",".join(bootstrap_ids), self.my_id, self.my_id)
         self._logger.info("Starting Avalanche with command: %s...", cmd)
 
         self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
