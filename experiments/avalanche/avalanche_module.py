@@ -356,7 +356,10 @@ class AvalancheModule(BlockchainModule):
                     self.transactions[tx_id] = (self.transactions[tx_id][0], confirm_time)
                     break
                 elif response["result"]["status"] == "Dropped":
-                    self._logger.info("Transaction %s dropped!", tx_id)
+                    self._logger.info("Transaction %s dropped! Response: %s", tx_id, response["result"])
+                    break
+                elif response["result"]["status"] == "Rejected":
+                    self._logger.info("Transaction %s rejected! Response: %s", tx_id, response["result"])
                     break
 
                 time.sleep(0.5)
