@@ -69,8 +69,8 @@ class AvalancheModule(BlockchainModule):
         staking_port = 14000 + self.my_id
         my_host, _ = self.experiment.get_peer_ip_port_by_id(self.my_id)
 
-        snow_sample_size = min(20, self.num_validators)
-        snow_quorum_size = min(14, self.num_validators)
+        snow_sample_size = min(20, self.num_validators / 2)
+        snow_quorum_size = min(14, self.num_validators / 2)
 
         cmd = "/home/martijn/avalanche/avalanchego --public-ip=%s --snow-sample-size=%d --snow-quorum-size=%d " \
               "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
