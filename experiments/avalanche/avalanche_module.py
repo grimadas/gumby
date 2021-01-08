@@ -397,21 +397,21 @@ class AvalancheModule(BlockchainModule):
             addresses_file.write(json.dumps(response["result"]["addresses"]))
 
         # Write the balance
-        payload = {
-            "method": "avm.getBalance",
-            "params": [{
-                "address": self.avax_address,
-                "assetID": "AVAX"
-            }],
-            "jsonrpc": "2.0",
-            "id": 0,
-        }
-
-        self._logger.info("Requesting balances...")
-        response = requests.post("http://localhost:%d/ext/bc/X" % (12000 + self.my_id), json=payload).json()
-        self._logger.info("Request balance response: %s" % response)
-        with open("balance.txt", "w") as balance_file:
-            balance_file.write(response["result"]["balance"])
+        # payload = {
+        #     "method": "avm.getBalance",
+        #     "params": [{
+        #         "address": self.avax_address,
+        #         "assetID": "AVAX"
+        #     }],
+        #     "jsonrpc": "2.0",
+        #     "id": 0,
+        # }
+        #
+        # self._logger.info("Requesting balances...")
+        # response = requests.post("http://localhost:%d/ext/bc/X" % (12000 + self.my_id), json=payload).json()
+        # self._logger.info("Request balance response: %s" % response)
+        # with open("balance.txt", "w") as balance_file:
+        #     balance_file.write(response["result"]["balance"])
 
         # Write the current validators
         payload = {
@@ -427,7 +427,7 @@ class AvalancheModule(BlockchainModule):
             validators_file.write(json.dumps(response["result"]))
 
     @experiment_callback
-    async def stop(self):
+    def stop(self):
         def kill(proc_pid):
             process = psutil.Process(proc_pid)
             for proc in process.children(recursive=True):
@@ -437,18 +437,6 @@ class AvalancheModule(BlockchainModule):
         if self.avalanche_process:
             self._logger.info("Stopping Avalanche...")
             kill(self.avalanche_process.pid)
-
-            # Since Avalanche does not obey my commands...
-            os.system("pkill -f avalanchego")
-            os.system("pkill -f evm")
-
-            await sleep(5)
-
-            # Since Avalanche does not obey my commands...
-            os.system("pkill -f avalanchego")
-            os.system("pkill -f evm")
-
-            await sleep(5)
 
             # Since Avalanche does not obey my commands...
             os.system("pkill -f avalanchego")

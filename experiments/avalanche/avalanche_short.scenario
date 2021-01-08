@@ -10,5 +10,7 @@
 @0:80 create_address
 @0:90 register_validators {1}
 @0:90 transfer_funds_to_others {1}
+@0:110 start_creating_transactions
+@0:120 stop_creating_transactions
 @0:140 write_stats
 @0:150 stop
