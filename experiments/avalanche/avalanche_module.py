@@ -322,6 +322,7 @@ class AvalancheModule(BlockchainModule):
         validator_host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
 
         def create_and_submit_tx():
+            self._logger.info("Creating transaction")
             submit_time = int(round(time.time() * 1000))
 
             payload = {
@@ -354,6 +355,7 @@ class AvalancheModule(BlockchainModule):
                 }
 
                 response = requests.post("http://%s:%d/ext/bc/X" % (validator_host, 12000 + validator_peer_id), json=payload).json()
+                self._logger.info("Poll response: %s" % response)
                 if response["result"]["status"] == "Accepted":
                     confirm_time = int(round(time.time() * 1000))
                     self.transactions[tx_id] = (self.transactions[tx_id][0], confirm_time)
