@@ -226,7 +226,7 @@ class AvalancheModule(BlockchainModule):
                 "method": "wallet.send",
                 "params": [{
                     "assetID": "AVAX",
-                    "amount": 1000000000,
+                    "amount": 100000000000,
                     "to": avax_address,
                     "username": "peer%d" % self.my_id,
                     "password": hexlify(hashlib.md5(b'peer%d' % self.my_id).digest()).decode(),
