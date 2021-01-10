@@ -8,9 +8,9 @@
 @0:20 start_libra_cli
 @0:25 create_accounts
 @0:40 mint
-@0:90 start_creating_transactions
-@0:90 start_monitor
-@0:100 stop_creating_transactions
-@0:110 stop_monitor
-@0:115 write_tx_stats
-@0:120 stop
+@0:120 start_creating_transactions
+@0:120 start_monitor
+@0:130 stop_creating_transactions
+@0:140 stop_monitor
+@0:145 write_stats
+@0:150 stop

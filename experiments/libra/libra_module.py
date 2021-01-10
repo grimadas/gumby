@@ -285,11 +285,19 @@ class LibraModule(BlockchainModule):
         self.monitor_lc.cancel()
 
     @experiment_callback
-    def write_tx_stats(self):
+    def write_stats(self):
+        if not self.is_client():
+            return
+
         # Write transaction data
         with open("transactions.txt", "w") as tx_file:
             for tx_num, tx_info in self.tx_info.items():
                 tx_file.write("%d,%d,%d\n" % (tx_num, tx_info[0], tx_info[1]))
+
+        # Write account balances
+        rpc_account = self.diem_client.get_account(self.sender_account.account_address)
+        balances = rpc_account.balances
+        print("Sender account balances: %s", balances)
 
     @experiment_callback
     async def stop(self):
