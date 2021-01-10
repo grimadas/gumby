@@ -298,7 +298,7 @@ class LibraModule(BlockchainModule):
         # Write account balances
         rpc_account = self.diem_client.get_account(self.sender_account.account_address)
         balances = rpc_account.balances
-        print("Sender account balances: %s", balances)
+        self._logger.info("Sender account balances: %s", balances)
 
     @experiment_callback
     async def stop(self):

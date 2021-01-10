@@ -3,10 +3,9 @@
 &module experiments.libra.libra_module.LibraModule
 
 @0:1 init_config
-@0:10 start_libra_validator {1}
-@0:15 start_libra_validator {2-1000}
-@0:20 start_libra_cli
-@0:25 create_accounts
+@0:10 start_libra_validator
+@0:30 start_libra_cli
+@0:35 create_accounts
 @0:40 mint
 @0:120 start_creating_transactions
 @0:120 start_monitor
