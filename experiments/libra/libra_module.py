@@ -154,7 +154,6 @@ class LibraModule(BlockchainModule):
             return web.Response(text="Exceeded max amount of {}".format(MAX_MINT / (10 ** 6)), status=400)
 
         self.faucet_client.sendline("a m {} {} XUS".format(address, amount / (10 ** 6)))
-        self.faucet_client.expect("Finished sending coins from faucet!", timeout=20)
 
         return web.Response(text="done")
 
