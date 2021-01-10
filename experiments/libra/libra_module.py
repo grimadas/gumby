@@ -107,7 +107,6 @@ class LibraModule(BlockchainModule):
 
         node_config["mempool"]["capacity_per_user"] = 10000
         node_config["consensus"]["max_block_size"] = 10000
-        node_config["base"]["data_dir"] = os.getcwd()
         node_config["execution"]["genesis_file_location"] = os.path.join("/tmp", "diem_data_%d" % self.num_validators, "%d" % self.validator_id, "genesis.blob")
         node_config["json_rpc"]["address"] = "0.0.0.0:%d" % (12000 + self.my_id)
 
