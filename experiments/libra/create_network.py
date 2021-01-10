@@ -12,7 +12,6 @@ STARTUP_BATCH_SIZE = 2
 
 
 def create_network(num_validators, root_dir):
-    waypoint_id = None
     print("Starting to create network info for %d validators in root dir %s..." % (num_validators, root_dir))
 
     cmd = "/home/jenkins/diem/diem-swarm -n %d --diem-node /this/does/not/exist -c %s 2>&1" % (num_validators, root_dir)
@@ -21,11 +20,6 @@ def create_network(num_validators, root_dir):
         line = process.stdout.readline()
         if not line:
             break
-        if b"Genesis calculated" in line and not waypoint_id:
-            waypoint_id = line[-68:-4].decode()
-            with open(os.path.join(root_dir, "waypoint"), "w") as wp_file:
-                wp_file.write(waypoint_id)
-            print("Waypoint ID: %s" % waypoint_id)
 
     print("Done with making network info!")
 

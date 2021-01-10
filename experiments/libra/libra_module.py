@@ -34,19 +34,16 @@ class LibraModule(BlockchainModule):
         self.libra_validator_process = None
         self.diem_client = None
         self.faucet_client = None
-        self.faucet_service = None
         self.libra_path = "/home/martijn/diem"
         self.validator_config = None
         self.validator_id = None
         self.validator_ids = None
         self.peer_ids = {}
-        self.waypoint_id = None
         self.validator_network_ids = {}
         self.sender_account = None
         self.receiver_account = None
         self.tx_info = {}
         self.last_tx_confirmed = -1
-        self.site = None
 
         self.monitor_lc = None
         self.current_seq_num = 0
@@ -101,13 +98,9 @@ class LibraModule(BlockchainModule):
                             self.validator_network_ids[validator_id] = full_network_string
                             break
 
-        # Get the waypoint ID
-        with open(os.path.join(diem_config_root_dir, "waypoint")) as wp_file:
-            self.waypoint_id = wp_file.read()
-            self._logger.info("Waypoint ID: %s", self.waypoint_id)
-
         self._logger.info("Modifying configuration file...")
 
+        # Write the new configuration file
         yaml = YAML()
         with open(os.path.join(diem_config_root_dir, "%d" % self.validator_id, "node.yaml"), "r") as node_config_file:
             node_config = yaml.load(node_config_file)
@@ -115,6 +108,7 @@ class LibraModule(BlockchainModule):
         node_config["mempool"]["capacity_per_user"] = 10000
         node_config["consensus"]["max_block_size"] = 10000
         node_config["base"]["data_dir"] = os.getcwd()
+        node_config["execution"]["genesis_file_location"] = os.path.join("/tmp", "diem_data_%d" % self.num_validators, "%d" % self.validator_id, "genesis.blob")
         node_config["json_rpc"]["address"] = "0.0.0.0:%d" % (12000 + self.my_id)
 
         for validator_id, network_string in self.validator_network_ids.items():
@@ -122,7 +116,7 @@ class LibraModule(BlockchainModule):
                 continue
             node_config["validator_network"]["seed_addrs"][self.peer_ids[validator_id]] = [network_string]
 
-        with open(os.path.join(diem_config_root_dir, "%d" % self.validator_id, "node.yaml"), "w") as crypto_config_file:
+        with open(os.path.join(os.getcwd(), "node.yaml"), "w") as crypto_config_file:
             yaml.dump(node_config, crypto_config_file)
 
     @experiment_callback
@@ -133,30 +127,10 @@ class LibraModule(BlockchainModule):
 
         self._logger.info("Starting libra validator with id %s...", self.validator_id)
         libra_exec_path = os.path.join(self.libra_path, "target", "release", "diem-node")
-        diem_config_root_dir = os.path.join("/tmp", "diem_data_%d" % self.num_validators)
-        config_path = os.path.join(diem_config_root_dir, "%d" % self.validator_id, "node.yaml")
+        config_path = os.path.join(os.getcwd(), "node.yaml")
 
         cmd = '%s -f %s > %s 2>&1' % (libra_exec_path, config_path, os.path.join(os.getcwd(), 'diem_output.log'))
         self.libra_validator_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
-
-    async def on_mint_request(self, request):
-        address = request.rel_url.query['address']
-        self._logger.info("Received mint request for address %s", address)
-        if re.match('^[a-f0-9]{64}$', address) is None:
-            return web.Response(text="Malformed address", status=400)
-
-        try:
-            amount = decimal.Decimal(request.rel_url.query['amount'])
-        except decimal.InvalidOperation:
-            return web.Response(text="Bad amount", status=400)
-
-        if amount > MAX_MINT:
-            return web.Response(text="Exceeded max amount of {}".format(MAX_MINT / (10 ** 6)), status=400)
-
-        self.faucet_client.sendline("a m {} {} XUS".format(address, amount / (10 ** 6)))
-        self.faucet_client.expect("Finished sending coins from faucet!", timeout=20)
-
-        return web.Response(text="done")
 
     @experiment_callback
     async def start_libra_cli(self):
@@ -164,26 +138,11 @@ class LibraModule(BlockchainModule):
         faucet_host, _ = self.experiment.get_peer_ip_port_by_id(1)
 
         if self.my_id == 1:
+            self._logger.info("Starting faucet!")
             # Start the minting service
             mint_key_path = os.path.join("/tmp", "diem_data_%d" % self.num_validators, "mint.key")
-            cmd = "%s/target/release/cli -u http://localhost:%d -m %s --waypoint 0:%s --chain-id 4" % (self.libra_path, 12000 + self.my_id, mint_key_path, self.waypoint_id)
-
-            self.faucet_client = pexpect.spawn(cmd)
-            self.faucet_client.delaybeforesend = 0.1
-            self.faucet_client.logfile = sys.stdout.buffer
-            self.faucet_client.expect("Connected to validator at", timeout=3)
-
-            # Also start the HTTP API for the faucet service
-            self._logger.info("Starting faucet HTTP API...")
-            app = web.Application()
-            app.add_routes([web.get('/', self.on_mint_request)])
-
-            runner = web.AppRunner(app, access_log=None)
-            await runner.setup()
-            # If localhost is used as hostname, it will randomly either use 127.0.0.1 or ::1
-            self.site = web.TCPSite(runner, port=8000)
-            await self.site.start()
-
+            cmd = "%s/target/release/diem-faucet -m %s -s http://localhost:%d -c 4 -p 8000 -a 0.0.0.0 > faucet.out 2>&1" % (self.libra_path, mint_key_path, 12000 + self.my_id)
+            self.faucet_client = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
         if self.is_client():
             validator_peer_id = (self.my_id - 1) % self.num_validators
             validator_host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id + 1)
@@ -207,18 +166,18 @@ class LibraModule(BlockchainModule):
             return
 
         client_id = self.my_id - self.num_validators
-        random_wait = 20 / self.num_clients * client_id
+        random_wait = (200 / self.num_clients) * (client_id - 1)
 
         await sleep(random_wait)
 
         faucet_host, _ = self.experiment.get_peer_ip_port_by_id(1)
-        address = self.sender_account.auth_key.hex()
+        auth_key = self.sender_account.auth_key.hex()
 
         async with aiohttp.ClientSession() as session:
-            url = "http://" + faucet_host + ":8000/?amount=%d&address=%s" % (1000000, address)
-            await session.get(url)
+            url = "http://" + faucet_host + ":8000/?amount=%d&auth_key=%s&currency_code=XUS" % (10000000000, auth_key)
+            await session.post(url)
 
-        print("Mint request performed!")
+        self._logger.info("Mint request performed with auth key %s!", auth_key)
 
     @staticmethod
     def create_transaction(sender, sender_account_sequence, script, currency):
@@ -305,8 +264,8 @@ class LibraModule(BlockchainModule):
         print("Stopping Diem...")
         if self.libra_validator_process:
             os.killpg(os.getpgid(self.libra_validator_process.pid), signal.SIGTERM)
-        if self.site:
-            await self.site.stop()
+        if self.faucet_client:
+            os.killpg(os.getpgid(self.faucet_client.pid), signal.SIGTERM)
 
         loop = get_event_loop()
         loop.stop()
