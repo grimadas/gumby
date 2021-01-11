@@ -230,21 +230,33 @@ ADDRESS="%s:%d"
         self.horizon_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
-    def upgrade_tx_set_size(self):
+    async def upgrade_tx_set_size(self):
         if self.is_client():
             return
 
-        self._logger.info("Upgrading tx size limit")
-        response = requests.get(
-            "http://127.0.0.1:%d/upgrades?mode=set&upgradetime=1970-01-01T00:00:00Z&maxtxsize=10000"
-            % (11000 + self.my_id,))
-        self._logger.info("Response: %s", response.text)
+        upgrade_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
         self._logger.info("Upgrading protocol version")
         response = requests.get(
-            "http://127.0.0.1:%d/upgrades?mode=set&upgradetime=1970-01-01T00:00:00Z&protocolversion=15"
+            "http://127.0.0.1:%d/upgrades?mode=set&upgradetime=%s&protocolversion=15"
+            % (11000 + self.my_id, upgrade_time))
+        self._logger.info("Response to protocol upgrade: %s", response.status_code)
+
+        await sleep(10)
+
+        self._logger.info("Upgrading tx size limit")
+        response = requests.get(
+            "http://127.0.0.1:%d/upgrades?mode=set&upgradetime=%s&maxtxsize=10000&protocolversion=15"
+            % (11000 + self.my_id, upgrade_time))
+        self._logger.info("Response to tx size upgrade: %s", response.status_code)
+
+        await sleep(10)
+
+        self._logger.info("Fetching network upgrade settings")
+        response = requests.get(
+            "http://127.0.0.1:%d/upgrades?mode=get"
             % (11000 + self.my_id,))
-        self._logger.info("Response: %s", response.text)
+        self._logger.info("Settings: %s", response.text)
 
     @experiment_callback
     async def create_accounts(self):
@@ -264,7 +276,7 @@ ADDRESS="%s:%d"
                 tx = builder.build()
                 tx.sign(root_keypair)
                 response = await server.submit_transaction(tx)
-                print("Create account response: %s" % response)
+                self._logger.info("Create account response: %s", response)
 
                 builder = TransactionBuilder(
                     source_account=root_account,
@@ -299,7 +311,7 @@ ADDRESS="%s:%d"
                 tx = builder.build()
                 tx.sign(root_keypair)
                 response = await server.submit_transaction(tx)
-                print("Create account response: %s" % response)
+                self._logger.info("Create account response: %s", response)
 
     @experiment_callback
     async def get_initial_sq_num(self):
