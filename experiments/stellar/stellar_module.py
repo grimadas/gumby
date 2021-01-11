@@ -6,7 +6,7 @@ import signal
 import requests
 import subprocess
 import time
-from asyncio import get_event_loop
+from asyncio import get_event_loop, sleep
 from threading import Thread
 
 from urllib.parse import quote_plus
@@ -72,7 +72,7 @@ class StellarModule(BlockchainModule):
         shutil.rmtree(self.db_path, ignore_errors=True)
         os.makedirs(self.db_path, exist_ok=True)
 
-        os.system("/usr/lib/postgresql/11/bin/initdb %s" % self.db_path)
+        os.system("/usr/lib/postgresql/11/bin/initdb %s > postgres.out" % self.db_path)
 
     @experiment_callback
     def start_db(self):
@@ -186,12 +186,14 @@ ADDRESS="%s:%d"
             os.system("/home/martijn/stellar-core/stellar-core new-hist vs --conf=stellar-core.cfg > publish_history.out")
 
     @experiment_callback
-    def start_validators(self):
+    async def start_validators(self):
         """
         Start all Stellar validators.
         """
         if self.is_client():
             return
+
+        await sleep(random.random() * 3)
 
         cmd = "/home/martijn/stellar-core/stellar-core run > stellar.out 2>&1"
         self.validator_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
