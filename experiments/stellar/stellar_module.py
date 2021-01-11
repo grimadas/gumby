@@ -20,11 +20,6 @@ from gumby.modules.blockchain_module import BlockchainModule
 from gumby.modules.experiment_module import static_module
 
 
-class AccountStatus:
-    IDLE = 0
-    REQ_PENDING = 1
-
-
 @static_module
 class StellarModule(BlockchainModule):
 
@@ -41,9 +36,9 @@ class StellarModule(BlockchainModule):
         self.sender_keypairs = [None] * self.num_accounts_per_client
         self.receiver_keypair = None
         self.sequence_numbers = [25769803776] * self.num_accounts_per_client
-        self.account_status = [AccountStatus.IDLE] * self.num_accounts_per_client
         self.current_tx_num = 0
         self.tx_submit_times = {}
+        self.current_account_nr = 0
 
     def on_all_vars_received(self):
         super(StellarModule, self).on_all_vars_received()
@@ -276,7 +271,7 @@ ADDRESS="%s:%d"
                 tx = builder.build()
                 tx.sign(root_keypair)
                 ensure_future(server.submit_transaction(tx))
-                await sleep(1)
+                await sleep(2)
 
                 builder = TransactionBuilder(
                     source_account=root_account,
@@ -323,10 +318,11 @@ ADDRESS="%s:%d"
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
         horizon_uri = "http://%s:%d" % (host, 19000 + validator_peer_id)
 
-        async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
-            sender_account = await server.load_account(self.sender_keypairs[0])
-            # Set the sequence number for all accounts
-            for account_ind in range(self.num_accounts_per_client):
+        for account_ind in range(self.num_accounts_per_client):
+            async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
+                sender_account = await server.load_account(self.sender_keypairs[account_ind])
+                # Set the sequence number for all accounts
+                self._logger.info("Sequence number for account %d: %d", account_ind, sender_account.sequence)
                 self.sequence_numbers[account_ind] = sender_account.sequence
 
     @experiment_callback
@@ -337,22 +333,10 @@ ADDRESS="%s:%d"
         validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
 
-        # Get an idle account
-        source_account_nr = None
-        for account_ind in range(self.num_accounts_per_client):
-            if self.account_status[account_ind] == AccountStatus.IDLE:
-                source_account_nr = account_ind
-                self.account_status[account_ind] = AccountStatus.REQ_PENDING
-                break
-
-        if source_account_nr is None:
-            self._logger.info("Could not find an idle account for transfer!")
-            return
-
         self._logger.info("Will transfer from account %d, sq num: %d",
-                          source_account_nr, self.sequence_numbers[source_account_nr])
+                          self.current_account_nr, self.sequence_numbers[self.current_account_nr])
 
-        sender_account = Account(self.sender_keypairs[source_account_nr].public_key, self.sequence_numbers[source_account_nr])
+        sender_account = Account(self.sender_keypairs[self.current_account_nr].public_key, self.sequence_numbers[self.current_account_nr])
         builder = TransactionBuilder(
             source_account=sender_account,
             network_passphrase="Standalone Pramati Network ; Oct 2018"
@@ -360,16 +344,15 @@ ADDRESS="%s:%d"
 
         builder.append_payment_op(self.receiver_keypair.public_key, '100', 'XLM')
         tx = builder.build()
-        tx.sign(self.sender_keypairs[source_account_nr])
+        tx.sign(self.sender_keypairs[self.current_account_nr])
 
-        self._logger.info("Submitting transaction with id %d", self.sequence_numbers[source_account_nr])
+        self._logger.info("Submitting transaction with id %d", self.sequence_numbers[self.current_account_nr])
 
         def send_transaction(tx, seq_num, account_nr):
-            tx_id = self.sender_keypairs[source_account_nr].public_key + "." + "%d" % seq_num
+            tx_id = self.sender_keypairs[self.current_account_nr].public_key + "." + "%d" % seq_num
             submit_time = int(round(time.time() * 1000))
             response = requests.get("http://%s:%d/tx?blob=%s"
                                     % (host, 11000 + validator_peer_id, quote_plus(tx)))
-            self.account_status[account_nr] = AccountStatus.IDLE
             self._logger.info("Received response for transaction with account %d and id %d: %s",
                               account_nr, seq_num, response.text)
             if response.status_code != 200 or response.json()["status"] != "PENDING":
@@ -381,12 +364,13 @@ ADDRESS="%s:%d"
                 self.tx_submit_times[tx_id] = submit_time
 
         t = Thread(target=send_transaction,
-                   args=(tx.to_xdr(), self.sequence_numbers[source_account_nr], source_account_nr))
+                   args=(tx.to_xdr(), self.sequence_numbers[self.current_account_nr], self.current_account_nr))
         t.daemon = True
         t.start()
 
-        self.sequence_numbers[source_account_nr] += 1
+        self.sequence_numbers[self.current_account_nr] += 1
         self.current_tx_num += 1
+        self.current_account_nr = (self.current_account_nr + 1) % self.num_accounts_per_client
 
     @experiment_callback
     def write_submit_times(self):
