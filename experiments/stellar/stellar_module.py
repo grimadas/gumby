@@ -1,4 +1,5 @@
 import os
+import random
 import shutil
 import signal
 
@@ -130,8 +131,13 @@ class StellarModule(BlockchainModule):
                 keys.append((seed, pub_key))
 
         # Make the validators info
+        k = int(os.getenv('QUORUM', 11))
+        full_list = list(range(self.num_validators))
+        quorum = random.sample(full_list, min(k, len(full_list)))
+
+        # Make the validators info
         validators_string = ""
-        for validator_index in range(self.num_validators):
+        for validator_index in quorum:
             if validator_index + 1 == self.my_id:
                 continue
             validator_host, _ = self.experiment.get_peer_ip_port_by_id(validator_index + 1)
