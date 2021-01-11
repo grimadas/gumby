@@ -170,8 +170,12 @@ ADDRESS="%s:%d"
         if self.is_client():
             return
 
+        self._logger.info("Creating new DB...")
+
         cmd = "/home/martijn/stellar-core/stellar-core new-db"
         os.system(cmd)  # Blocking execution
+
+        self._logger.info("Forcing SCP...")
 
         cmd = "/home/martijn/stellar-core/stellar-core force-scp"
         os.system(cmd)  # Blocking execution
@@ -179,7 +183,7 @@ ADDRESS="%s:%d"
         # Publish history
         if self.my_id == 1:
             self._logger.info("Publish a new history...")
-            os.system("/home/martijn/stellar-core/stellar-core new-hist vs --conf=stellar-core.cfg")
+            os.system("/home/martijn/stellar-core/stellar-core new-hist vs --conf=stellar-core.cfg > publish_history.out")
 
     @experiment_callback
     def start_validators(self):
