@@ -80,7 +80,7 @@ class StellarModule(BlockchainModule):
             return
 
         os.environ["PGDATA"] = self.db_path
-        cmd = "/usr/lib/postgresql/11/bin/pg_ctl start"
+        cmd = "/usr/lib/postgresql/11/bin/pg_ctl start -o \"-N 300\""
         self.postgres_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
 
     @experiment_callback
