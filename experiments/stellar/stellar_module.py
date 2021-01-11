@@ -6,7 +6,7 @@ import signal
 import requests
 import subprocess
 import time
-from asyncio import get_event_loop, sleep
+from asyncio import get_event_loop, sleep, ensure_future
 from threading import Thread
 
 from urllib.parse import quote_plus
@@ -275,8 +275,8 @@ ADDRESS="%s:%d"
                 self._logger.info("Sending create transaction ops...")
                 tx = builder.build()
                 tx.sign(root_keypair)
-                response = await server.submit_transaction(tx)
-                self._logger.info("Create account response: %s", response)
+                ensure_future(server.submit_transaction(tx))
+                await sleep(1)
 
                 builder = TransactionBuilder(
                     source_account=root_account,
@@ -310,8 +310,7 @@ ADDRESS="%s:%d"
                 self._logger.info("Sending remaining create transaction ops...")
                 tx = builder.build()
                 tx.sign(root_keypair)
-                response = await server.submit_transaction(tx)
-                self._logger.info("Create account response: %s", response)
+                ensure_future(server.submit_transaction(tx))
 
     @experiment_callback
     async def get_initial_sq_num(self):
