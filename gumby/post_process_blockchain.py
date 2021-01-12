@@ -24,6 +24,7 @@ class BlockchainTransactionsParser(StatisticsParser):
         self.parse_transactions()
         self.compute_latency_stat_moments()
         self.compute_tx_cumulative_stats()
+        self.combine_bandwidth_stats()
         self.aggregate_disk_usage()
         self.write_all()
 
@@ -37,6 +38,29 @@ class BlockchainTransactionsParser(StatisticsParser):
                 num_files += 1
 
         self.avg_start_time = int(avg_start_time / num_files) if num_files > 0 else -1
+
+    def combine_bandwidth_stats(self):
+        with open("system_bandwidth.csv", "w") as b_f:
+            b_f.write("src,dst,count,peer_nr\n")
+            for peer_nr, filename, _ in self.yield_files('system_bandwidth.csv'):
+                first = True
+                with open(filename, 'r') as annotation_file:
+                    for line in annotation_file.readlines():
+                        if first:
+                            first = False
+                            continue
+                        b_f.write("%s,%d\n" % (line[:-1], int(peer_nr)))
+
+        with open("scapy_bandwidth.csv", "w") as b_f:
+            b_f.write("src,dst,count,peer_nr\n")
+            for peer_nr, filename, _ in self.yield_files('scapy_bandwidth.csv'):
+                first = True
+                with open(filename, 'r') as annotation_file:
+                    for line in annotation_file.readlines():
+                        if first:
+                            first = False
+                            continue
+                        b_f.write("%s,%d\n" % (line[:-1], int(peer_nr)))
 
     def parse_transactions(self):
         """

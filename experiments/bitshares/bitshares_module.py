@@ -302,15 +302,15 @@ class BitsharesModule(BlockchainModule):
         total_up = 0
         total_down = 0
         connected_peers = self.wallet_rpc.network_get_connected_peers()
-        for peer in connected_peers:
-            total_up += peer["info"]["bytessent"]
-            total_down += peer["info"]["bytesrecv"]
-
-        with open("bandwidth.txt", "w") as bandwidth_file:
-            bandwidth_file.write("%d,%d,%d" % (total_up, total_down, total_up + total_down))
-
-        with open("verbose_bandwidth.txt", "w") as bandwidth_file:
-            bandwidth_file.write(str(connected_peers))
+        with open("system_bandwidth.csv", "w") as bandwidth_file:
+            bandwidth_file.write("src,dst,count\n")
+            for peer in connected_peers:
+                bandwidth_file.write('%s,%s,%d\n' % (peer["info"]['addrlocal'],
+                                                     peer['info']['addr'],
+                                                     peer['info']['bytessent']))
+                bandwidth_file.write('%s,%s,%d\n' % (peer["info"]['addr'],
+                                                     peer['info']['addrlocal'],
+                                                     peer['info']['bytesrecv']))
 
     @experiment_callback
     def stop(self):

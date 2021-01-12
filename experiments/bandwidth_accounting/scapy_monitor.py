@@ -81,7 +81,7 @@ class ScapyMonitor:
         import csv
         csv_columns = ['src', 'dst', 'count']
 
-        csv_file = os.path.join(prefix, "byte_counts.csv")
+        csv_file = os.path.join(prefix, "scapy_bandwidth.csv")
         try:
             with open(csv_file, 'w') as f:
                 writer = csv.DictWriter(f, fieldnames=csv_columns)
@@ -100,7 +100,6 @@ class ScapyMonitor:
             prefix = ''
             self.write_packets(prefix)
             self.write_bytes_counts(prefix)
-            self.write_packet_counts(prefix)
         sys.exit(0)
 
 
