@@ -18,6 +18,7 @@ class TransactionsModule(ExperimentModule):
         self.tx_lc = None
         self.did_write_start_time = False
         self.transfer = None
+        self.stop_event = None
 
     def on_all_vars_received(self):
         super(TransactionsModule, self).on_all_vars_received()
@@ -30,6 +31,16 @@ class TransactionsModule(ExperimentModule):
 
     def is_client(self):
         return self.experiment.my_id > self.num_validators
+
+    @experiment_callback
+    def crash_nodes(self):
+        num_crashed_node = int(os.environ.get("CRASH_NODES", 0))
+        print('Num of crashed nodes', num_crashed_node)
+
+        if int(self.experiment.my_id) <= num_crashed_node:
+            # stop the node
+            self._logger.info('Crashing node (%d)', self.experiment.my_id)
+            self.stop_event()
 
     @experiment_callback
     def start_creating_transactions(self):

@@ -39,6 +39,7 @@ class HyperledgerModule(BlockchainModule):
     def on_all_vars_received(self):
         super(HyperledgerModule, self).on_all_vars_received()
         self.transactions_manager.transfer = self.transfer
+        self.transactions_manager.stop_event = self.crash_node
 
     @experiment_callback
     def generate_config(self):
@@ -507,6 +508,11 @@ class HyperledgerModule(BlockchainModule):
         print(response)
 
     @experiment_callback
+    def crash_node(self):
+        self.transactions_manager.stop_creating_transactions()
+        self.stop_hyperledger()
+
+    @experiment_callback
     def stop_monitor(self):
         """
         Stop monitoring the blocks.
@@ -529,7 +535,11 @@ class HyperledgerModule(BlockchainModule):
     @experiment_callback
     async def transfer(self):
         self._logger.info("Initiating transaction...")
-        validator_peer_id = ((self.experiment.my_id - 1) % self.num_validators) + 1
+
+        num_crashed_node = int(os.environ.get("CRASH_NODES", 0))
+        validator_peer_id = ((self.experiment.my_id - 1) %
+                             (self.num_validators - num_crashed_node)) + 1 + num_crashed_node
+
         start_time = time.time()
         submit_time = int(round(start_time * 1000))
 
@@ -565,12 +575,14 @@ class HyperledgerModule(BlockchainModule):
                 tx_times_file.write("%s,%d\n" % (tx_id, submit_time))
 
     @experiment_callback
-    def stop(self):
+    def stop_system(self):
         print("Stopping Hyperledger Fabric...")
         if self.orderer_process:
             self.orderer_process.terminate()
         if self.peer_process:
             self.peer_process.terminate()
 
+    @experiment_callback
+    def stop(self):
         loop = get_event_loop()
         loop.stop()

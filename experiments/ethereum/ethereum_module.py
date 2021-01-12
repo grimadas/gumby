@@ -58,6 +58,11 @@ class EthereumModule(BlockchainModule):
                 with open(os.path.join(os.environ["HOME"], "genesis.json"), "w") as genesis_json_file:
                     genesis_json_file.write(unhexlify(msg).decode())
 
+    def on_all_vars_received(self):
+        super().on_all_vars_received()
+
+        self.transactions_manager.stop_event = self.crash_stop_event
+
     @experiment_callback
     def generate_keypair(self):
         """
@@ -69,7 +74,8 @@ class EthereumModule(BlockchainModule):
         with open("password.txt", "w") as password_file:
             password_file.write("password")
 
-        cmd = "%s account new --datadir data --password password.txt" % os.path.join(os.environ["HOME"], "geth_bin", "geth")
+        cmd = "%s account new --datadir data --password password.txt" % os.path.join(os.environ["HOME"], "geth_bin",
+                                                                                     "geth")
         process = subprocess.Popen([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         process.wait()
 
@@ -159,6 +165,11 @@ class EthereumModule(BlockchainModule):
         process.wait()
 
         self._logger.info("Blockchain data dir initialized.")
+
+    def crash_stop_event(self):
+        self.transactions_manager.stop_creating_transactions()
+        self.write_stats()
+        self.stop_ethereum()
 
     @experiment_callback
     async def start_ethereum(self):
@@ -413,10 +424,12 @@ class EthereumModule(BlockchainModule):
                 out_file.write(w3.toJSON(block) + "\n")
 
     @experiment_callback
-    def stop_ethereum(self):
+    def stop_system(self):
         if self.ethereum_process:
             self._logger.info("Stopping Ethereum...")
             self.ethereum_process.terminate()
 
+    @experiment_callback
+    def stop(self):
         loop = get_event_loop()
         loop.stop()

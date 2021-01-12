@@ -260,12 +260,14 @@ class LibraModule(BlockchainModule):
         self._logger.info("Sender account balances: %s", balances)
 
     @experiment_callback
-    async def stop(self):
+    async def stop_system(self):
         print("Stopping Diem...")
         if self.libra_validator_process:
             self.libra_validator_process.terminate()
         if self.faucet_client:
             self.faucet_client.terminate()
 
+    @experiment_callback
+    async def stop(self):
         loop = get_event_loop()
         loop.stop()

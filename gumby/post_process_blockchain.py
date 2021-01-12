@@ -1,3 +1,5 @@
+import pandas as pd
+
 from gumby.statsparser import StatisticsParser
 
 
@@ -10,8 +12,9 @@ class BlockchainTransactionsParser(StatisticsParser):
         super(BlockchainTransactionsParser, self).__init__(node_directory)
         self.transactions = []
         self.cumulative_stats = []
-        self.avg_latency = -1
         self.avg_start_time = 0
+
+        self.latency_moments = {}
 
     def parse(self):
         """
@@ -19,7 +22,7 @@ class BlockchainTransactionsParser(StatisticsParser):
         """
         self.compute_avg_start_time()
         self.parse_transactions()
-        self.compute_avg_latency()
+        self.compute_latency_stat_moments()
         self.compute_tx_cumulative_stats()
         self.aggregate_disk_usage()
         self.write_all()
@@ -42,18 +45,9 @@ class BlockchainTransactionsParser(StatisticsParser):
         """
         pass
 
-    def compute_avg_latency(self):
-        """
-        Compute the average transaction latency.
-        """
-        avg_latency = 0
-        num_comfirmed = 0
-        for transaction in self.transactions:
-            if transaction[4] != -1:
-                avg_latency += transaction[4]
-                num_comfirmed += 1
-
-        self.avg_latency = (avg_latency / num_comfirmed) if num_comfirmed > 0 else -1
+    def compute_latency_stat_moments(self):
+        v = [t[4] if t[4] >= 0 else None for t in self.transactions]
+        self.latency_moments = pd.Series(v).dropna().describe().to_dict()
 
     def compute_tx_cumulative_stats(self):
         """
@@ -122,4 +116,4 @@ class BlockchainTransactionsParser(StatisticsParser):
                 out_file.write("%d,%d,%d\n" % result)
 
         with open("latency.txt", "w") as latency_file:
-            latency_file.write("%f" % self.avg_latency)
+            latency_file.write(str(self.latency_moments))

@@ -1,7 +1,9 @@
 &module gumby.modules.experiment_module.ExperimentModule
 &module gumby.modules.transactions_module.TransactionsModule
 &module experiments.bitshares.bitshares_module.BitsharesModule
+&module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
 
+@0:5 start_traffic_monitor
 @0:5 start_bitshares {1}
 @0:8 start_bitshares {2-1000}
 @0:20 start_cli_wallet
@@ -13,4 +15,6 @@
 @0:60 start_dumping_blockchain {1}
 @0:70 stop_creating_transactions
 @0:85 write_stats
+@0:85 stop_traffic_monitor
+@0:90 stop_system
 @0:90 stop

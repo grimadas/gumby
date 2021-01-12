@@ -41,6 +41,11 @@ class BurrowModule(BlockchainModule):
     def on_all_vars_received(self):
         super(BurrowModule, self).on_all_vars_received()
         self.transactions_manager.transfer = self.transfer
+        self.transactions_manager.stop_event = self.crash_node
+
+    def crash_node(self) -> None:
+        self.transactions_manager.stop_creating_transactions()
+        self.stop_burrow()
 
     @experiment_callback
     def transfer(self):
@@ -308,11 +313,13 @@ class BurrowModule(BlockchainModule):
                 out_file.write(w3.toJSON(block) + "\n")
 
     @experiment_callback
-    def stop_burrow(self):
+    def stop_system(self):
         print("Stopping Burrow...")
 
         if self.burrow_process:
             os.killpg(os.getpgid(self.burrow_process.pid), signal.SIGTERM)
 
+    @experiment_callback
+    def stop(self):
         loop = get_event_loop()
         loop.stop()

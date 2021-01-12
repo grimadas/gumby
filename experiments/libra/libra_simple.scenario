@@ -1,9 +1,11 @@
 &module gumby.modules.experiment_module.ExperimentModule
 &module gumby.modules.transactions_module.TransactionsModule
 &module experiments.libra.libra_module.LibraModule
+&module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
 
 @0:1 generate_config {1}
 @0:2 init_config
+@0:5 start_traffic_monitor
 @0:5 start_libra_validator
 @0:12 start_libra_client {1}
 @0:18 start_libra_client {2-500}
@@ -15,4 +17,6 @@
 @0:200 stop_monitor
 @0:200 print_balance 0
 @0:200 write_tx_stats
+@0:200 stop_traffic_monitor
+@0:210 stop_system
 @0:210 stop

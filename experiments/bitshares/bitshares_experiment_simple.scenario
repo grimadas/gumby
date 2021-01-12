@@ -13,4 +13,5 @@
 @0:90 start_dumping_blockchain {1}
 @0:210 stop_creating_transactions
 @0:225 write_stats
+@0:229 stop_system
 @0:230 stop

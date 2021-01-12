@@ -44,6 +44,11 @@ class AlgorandModule(BlockchainModule):
     def on_all_vars_received(self):
         super(AlgorandModule, self).on_all_vars_received()
         self.transactions_manager.transfer = self.transfer
+        self.transactions_manager.stop_event = self.crash_node
+
+    def crash_node(self) -> None:
+        self.transactions_manager.stop_creating_transactions()
+        self.stop_system()
 
     def get_data_dir(self, peer_id):
         return os.path.join("/tmp/algo_data_%d" % self.num_validators, "Node%d" % peer_id)
@@ -130,7 +135,11 @@ class AlgorandModule(BlockchainModule):
     @experiment_callback
     def start_client(self):
         # Find out to which validator we should connect
-        validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
+        num_crashed_node = int(os.environ.get("CRASH_NODES", 0))
+        #validator_peer_id = ((self.my_id - 1) % self.num_validators) + 1
+        validator_peer_id = ((self.my_id - 1)
+                             % (self.num_validators - num_crashed_node))\
+                            + 1 + num_crashed_node
 
         self._logger.info("Starting Algorand client...")
 
@@ -264,3 +273,7 @@ class AlgorandModule(BlockchainModule):
 
         os.system("pkill -f algod")
         os.system("pkill -f kmd")
+
+    @experiment_callback
+    def stop(self):
+        pass

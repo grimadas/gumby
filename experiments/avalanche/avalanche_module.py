@@ -440,9 +440,11 @@ class AvalancheModule(BlockchainModule):
 
     @experiment_callback
     def stop(self):
+        loop = get_event_loop()
+        loop.stop()
+
+    @experiment_callback
+    def stop_system(self):
         if self.avalanche_process:
             os.system("pkill -f avalanchego")
             os.system("pkill -f evm")
-
-        loop = get_event_loop()
-        loop.stop()

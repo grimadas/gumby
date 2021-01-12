@@ -311,6 +311,11 @@ class BitsharesModule(BlockchainModule):
 
     @experiment_callback
     def stop(self):
+        loop = get_event_loop()
+        loop.stop()
+
+    @experiment_callback
+    def stop_system(self):
         print("Stopping BitShares...")
         if self.bs_process:
             self.bs_process.terminate()
@@ -319,6 +324,3 @@ class BitsharesModule(BlockchainModule):
 
         if self.dump_blockchain_lc:
             self.dump_blockchain_lc.cancel()
-
-        loop = get_event_loop()
-        loop.stop()

@@ -2,8 +2,10 @@
 &module gumby.modules.transactions_module.TransactionsModule
 &module experiments.ethereum.ethereum_module.EthereumModule
 &module experiments.ethereum.erc20_module.ERC20Module
+&module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
 
 @0:1 generate_keypair
+@0:5 start_traffic_monitor
 @0:6 generate_genesis {1}
 @0:8 initialize_chain
 @0:10 start_ethereum
@@ -13,4 +15,6 @@
 @0:70 start_creating_transactions
 @0:80 stop_creating_transactions
 @0:100 write_stats
-@0:110 stop_ethereum
+@0:100 stop_traffic_monitor
+@0:109 stop_system
+@0:110 stop

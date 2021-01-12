@@ -1,3 +1,4 @@
+import os
 import random
 import string
 import time
@@ -32,7 +33,9 @@ class ERC20Module(ExperimentModule):
         self.ethereum_module = self.get_ethereum_module()
         self.ethereum_module.transactions_manager.transfer = self.transfer
 
-        self.validator_peer_id = ((self.my_id - 1) % self.ethereum_module.num_validators) + 1
+        num_crashed_node = int(os.environ.get("CRASH_NODES", 0))
+        self.validator_peer_id = ((self.my_id - 1)
+                                  % (self.ethereum_module.num_validators - num_crashed_node)) + 1 + num_crashed_node
         host, _ = self.experiment.get_peer_ip_port_by_id(self.validator_peer_id)
         url = 'http://%s:%d' % (host, 14000 + self.validator_peer_id)
         self.w3 = Web3(Web3.HTTPProvider(url))

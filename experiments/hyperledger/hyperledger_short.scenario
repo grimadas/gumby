@@ -1,9 +1,11 @@
 &module gumby.modules.experiment_module.ExperimentModule
 &module gumby.modules.transactions_module.TransactionsModule
 &module experiments.hyperledger.hyperledger_module.HyperledgerModule
+&module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
 
 @0:1 generate_config {1}
 @0:3 generate_artifacts {1}
+@0:5 start_traffic_monitor
 @0:25 share_config_with_other_nodes {1}
 @0:28 init_config
 @0:28 generate_client_config
@@ -18,4 +20,6 @@
 @0:195 stop_monitor {1}
 @0:196 parse_blockchain {1}
 @0:196 write_stats
+@0:196 stop_traffic_monitor
+@0:205 stop_system
 @0:205 stop

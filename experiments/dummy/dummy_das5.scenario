@@ -1,5 +1,8 @@
 &module gumby.modules.experiment_module.ExperimentModule
 &module experiments.dummy.dummy_module.DummyModule
+&module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
 
 @0:1 write_peer_id
+@0:1 start_monitor
+@0:4 stop_monitor
 @0:5 stop

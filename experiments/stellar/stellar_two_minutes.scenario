@@ -1,8 +1,10 @@
 &module gumby.modules.experiment_module.ExperimentModule
 &module gumby.modules.transactions_module.TransactionsModule
 &module experiments.stellar.stellar_module.StellarModule
+&module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
 
 @0:1 init_db
+@0:5 start_traffic_monitor
 @0:5 start_db
 @0:7 setup_db
 @0:8 create_db
@@ -17,4 +19,6 @@
 @0:250 stop_creating_transactions
 @0:270 parse_ledgers {1}
 @0:270 write_stats
+@0:270 stop_traffic_monitor
+@0:310 stop_system
 @0:310 stop

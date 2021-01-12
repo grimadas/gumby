@@ -46,6 +46,11 @@ class StellarModule(BlockchainModule):
     def on_all_vars_received(self):
         super(StellarModule, self).on_all_vars_received()
         self.transactions_manager.transfer = self.transfer
+        self.transactions_manager.stop_event = self.crash_node
+
+    def crash_node(self) -> None:
+        self.transactions_manager.stop_creating_transactions()
+        self.stop_stellar()
 
     def on_message(self, from_id, msg_type, msg):
         self._logger.info("Received message with type %s from peer %d", msg_type, from_id)
@@ -442,7 +447,7 @@ ADDRESS="%s:%d"
                 tx_finalized_times_file.write("%s,%d\n" % (tx_id, close_time))
 
     @experiment_callback
-    def stop(self):
+    def stop_system(self):
         self._logger.info("Stopping Stellar...")
         if self.postgres_process:
             self._logger.info("Killing postgres")
@@ -454,5 +459,7 @@ ADDRESS="%s:%d"
             self._logger.info("Killing horizon")
             self.horizon_process.terminate()
 
+    @experiment_callback
+    def stop(self):
         loop = get_event_loop()
         loop.stop()
