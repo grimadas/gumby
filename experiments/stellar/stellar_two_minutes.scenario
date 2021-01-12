@@ -15,6 +15,6 @@
 @0:120 get_initial_sq_num
 @0:130 start_creating_transactions
 @0:250 stop_creating_transactions
-@0:280 parse_ledgers {1}
-@0:280 write_submit_times
-@0:300 stop
+@0:270 parse_ledgers {1}
+@0:270 write_submit_times
+@0:310 stop
