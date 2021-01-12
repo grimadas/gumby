@@ -265,13 +265,14 @@ ADDRESS="%s:%d"
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
         horizon_uri = "http://%s:%d" % (host, 19000 + validator_peer_id)
 
-        async def append_create_account_op(builder, server, root_keypair, root_account, receiver_pub_key, amount):
+        async def append_create_account_op(builder, root_keypair, root_account, receiver_pub_key, amount):
             builder.append_create_account_op(receiver_pub_key, amount, root_keypair.public_key)
             if len(builder.operations) == 100:
                 self._logger.info("Sending create transaction ops...")
                 tx = builder.build()
                 tx.sign(root_keypair)
-                ensure_future(server.submit_transaction(tx))
+                async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
+                    ensure_future(server.submit_transaction(tx))
                 await sleep(2)
 
                 builder = TransactionBuilder(
@@ -281,31 +282,32 @@ ADDRESS="%s:%d"
 
             return builder
 
+        root_keypair = Keypair.from_secret("SDJ5AQWLIAYT22TCYSKOQALI3SNUMPAR63SEL73ASALDP6PYDN54FARM")
         async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
-            root_keypair = Keypair.from_secret("SDJ5AQWLIAYT22TCYSKOQALI3SNUMPAR63SEL73ASALDP6PYDN54FARM")
             root_account = await server.load_account(root_keypair.public_key)
 
-            builder = TransactionBuilder(
-                source_account=root_account,
-                network_passphrase="Standalone Pramati Network ; Oct 2018"
-            )
+        builder = TransactionBuilder(
+            source_account=root_account,
+            network_passphrase="Standalone Pramati Network ; Oct 2018"
+        )
 
-            for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
-                receiver_keypair = Keypair.random()
-                builder = await append_create_account_op(builder, server, root_keypair, root_account, receiver_keypair.public_key, "10000000")
-                self.experiment.send_message(client_index, b"receive_account_seed", receiver_keypair.secret.encode())
+        for client_index in range(self.num_validators + 1, self.num_validators + self.num_clients + 1):
+            receiver_keypair = Keypair.random()
+            builder = await append_create_account_op(builder, root_keypair, root_account, receiver_keypair.public_key, "10000000")
+            self.experiment.send_message(client_index, b"receive_account_seed", receiver_keypair.secret.encode())
 
-                # Create the sender accounts
-                for account_ind in range(self.num_accounts_per_client):
-                    sender_keypair = Keypair.random()
-                    builder = await append_create_account_op(builder, server, root_keypair, root_account, sender_keypair.public_key, "10000000")
-                    self.experiment.send_message(client_index, b"send_account_seed_%d" % account_ind, sender_keypair.secret.encode())
+            # Create the sender accounts
+            for account_ind in range(self.num_accounts_per_client):
+                sender_keypair = Keypair.random()
+                builder = await append_create_account_op(builder, root_keypair, root_account, sender_keypair.public_key, "10000000")
+                self.experiment.send_message(client_index, b"send_account_seed_%d" % account_ind, sender_keypair.secret.encode())
 
-            # Send the remaining operations
-            if builder.operations:
-                self._logger.info("Sending remaining create transaction ops...")
-                tx = builder.build()
-                tx.sign(root_keypair)
+        # Send the remaining operations
+        if builder.operations:
+            self._logger.info("Sending remaining create transaction ops...")
+            tx = builder.build()
+            tx.sign(root_keypair)
+            async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
                 ensure_future(server.submit_transaction(tx))
 
     @experiment_callback
