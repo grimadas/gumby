@@ -309,6 +309,9 @@ class BitsharesModule(BlockchainModule):
         with open("bandwidth.txt", "w") as bandwidth_file:
             bandwidth_file.write("%d,%d,%d" % (total_up, total_down, total_up + total_down))
 
+        with open("verbose_bandwidth.txt", "w") as bandwidth_file:
+            bandwidth_file.write(str(connected_peers))
+
     @experiment_callback
     def stop(self):
         loop = get_event_loop()
