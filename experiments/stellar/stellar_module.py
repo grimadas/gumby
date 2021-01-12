@@ -14,6 +14,7 @@ from urllib.parse import quote_plus
 from datetime import datetime
 
 from stellar_sdk import Keypair, TransactionBuilder, AiohttpClient, Server, Account, TransactionEnvelope
+from stellar_sdk.exceptions import NotFoundError
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
@@ -320,10 +321,13 @@ ADDRESS="%s:%d"
 
         for account_ind in range(self.num_accounts_per_client):
             async with Server(horizon_url=horizon_uri, client=AiohttpClient()) as server:
-                sender_account = await server.load_account(self.sender_keypairs[account_ind])
-                # Set the sequence number for all accounts
-                self._logger.info("Sequence number for account %d: %d", account_ind, sender_account.sequence)
-                self.sequence_numbers[account_ind] = sender_account.sequence
+                try:
+                    sender_account = await server.load_account(self.sender_keypairs[account_ind])
+                    # Set the sequence number for all accounts
+                    self._logger.info("Sequence number for account %d: %d", account_ind, sender_account.sequence)
+                    self.sequence_numbers[account_ind] = sender_account.sequence
+                except NotFoundError:
+                    self._logger.warning("Unable to fetch sequence number for account %d!", account_ind)
 
     @experiment_callback
     def transfer(self):
