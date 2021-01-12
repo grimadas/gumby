@@ -99,6 +99,8 @@ class ScapyMonitor:
             prefix = os.environ.get('PROJECT_DIR', '')
             prefix = ''
             self.write_packets(prefix)
+            self.write_bytes_counts(prefix)
+            self.write_packet_counts(prefix)
         sys.exit(0)
 
 
