@@ -19,7 +19,7 @@ from algosdk.wallet import Wallet
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
-from gumby.modules.experiment_module import static_module
+from gumby.modules.experiment_module import static_module, ExperimentModule
 
 
 @static_module
@@ -229,6 +229,12 @@ class AlgorandModule(BlockchainModule):
     @experiment_callback
     def write_info(self):
         if not self.is_client():
+            self._logger.info("Writing disk usage...")
+            # Write the disk usage of the data directory
+            with open("disk_usage.txt", "w") as disk_out_file:
+                dir_size = ExperimentModule.get_dir_size(self.get_data_dir(self.my_id))
+                disk_out_file.write("%d" % dir_size)
+
             return
 
         # Get the confirmation times of all transactions and write them away
@@ -253,5 +259,8 @@ class AlgorandModule(BlockchainModule):
 
     @experiment_callback
     def stop_algorand(self):
+        if self.is_client():
+            return
+
         os.system("pkill -f algod")
         os.system("pkill -f kmd")
