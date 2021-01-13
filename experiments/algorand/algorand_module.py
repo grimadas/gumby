@@ -229,7 +229,16 @@ class AlgorandModule(BlockchainModule):
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
         response = requests.get("http://%s:%d/metrics" % (host, 18500 + validator_peer_id),
                                 headers={"X-Algo-API-Token": rest_token})
-        print(str(response))
+        total_up = 0
+        total_down = 0
+        lines = response.text.splitlines()
+        for k in lines:
+            if k.startswith('algod_network_sent_bytes_total{}'):
+                total_up = int(k.split()[1])
+            if k.startswith('algod_network_received_bytes_total{}'):
+                total_down = int(k.split()[1])
+        with open("bandwidth.txt", "w") as bandwidth_file:
+            bandwidth_file.write("%d,%d" % (total_up, total_down))
 
         response = requests.get("http://%s:%d/v2/status" % (host, 18500 + validator_peer_id),
                                 headers={"X-Algo-API-Token": rest_token})
