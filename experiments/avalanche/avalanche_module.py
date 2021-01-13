@@ -438,6 +438,9 @@ class AvalancheModule(BlockchainModule):
         with open("validators.txt", "w") as validators_file:
             validators_file.write(json.dumps(response["result"]))
 
+        response = requests.post("http://localhost:%d/ext/metrics" % (12000 + self.my_id))
+        print(response.text)
+
     @experiment_callback
     def stop(self):
         loop = get_event_loop()
