@@ -58,9 +58,20 @@ class BlockchainTransactionsParser(StatisticsParser):
                             continue
                         b_f.write("%s,%d\n" % (line[:-1], int(peer_nr)))
 
-        with open("scapy_bandwidth.csv", "w") as b_f:
-            b_f.write("src,dst,count,peer_nr\n")
-            for peer_nr, filename, _ in self.yield_files('scapy_bandwidth.csv'):
+        with open("traffic_res.csv", "w") as b_f:
+            b_f.write("process,total_up,total_down,peer_nr\n")
+            for peer_nr, filename, _ in self.yield_files('traffic_res.csv'):
+                first = True
+                with open(filename, 'r') as annotation_file:
+                    for line in annotation_file.readlines():
+                        if first:
+                            first = False
+                            continue
+                        b_f.write("%s,%d\n" % (line[:-1], int(peer_nr)))
+
+        with open("traffic_times.csv", "w") as b_f:
+            b_f.write("process,total_up,total_down,time,peer_nr\n")
+            for peer_nr, filename, _ in self.yield_files('traffic_times.csv'):
                 first = True
                 with open(filename, 'r') as annotation_file:
                     for line in annotation_file.readlines():

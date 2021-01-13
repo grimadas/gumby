@@ -44,7 +44,7 @@ class TrafficMonitor(ExperimentModule):
             path = os.path.join(os.environ.get('PROJECT_DIR'),
                                 'experiments',
                                 'bandwidth_accounting',
-                                'scapy_monitor.py')
+                                'nethogs_monitor.py')
             cmd = 'sudo python3 -u %s > monitor.log 2>&1' % str(path)
 
             print(cmd)
@@ -58,4 +58,4 @@ class TrafficMonitor(ExperimentModule):
             pgid = os.getpgid(self.run_process.pid)
             print(pgid)
             print(self.run_process.pid)
-            subprocess.check_call(['sudo', 'pkill', '-f', 'scapy_monitor.py'])
+            subprocess.check_call(['sudo', 'pkill', '-f', 'nethogs_monitor.py'])
