@@ -1,14 +1,13 @@
 import hashlib
 import json
 import os
-import signal
 from random import sample
 
 import requests
 import shutil
 import subprocess
 import time
-from asyncio import get_event_loop, sleep
+from asyncio import get_event_loop
 from binascii import hexlify
 from threading import Thread
 
@@ -120,13 +119,13 @@ class AlgorandModule(BlockchainModule):
             ip, _ = self.experiment.get_peer_ip_port_by_id(peer_id)
             addresses.append("%s:%d" % (ip, 13000 + peer_id))
 
-        cmd = "goal node start -d %s -p \"%s\"" % (self.get_data_dir(self.my_id), ";".join(addresses))
+        cmd = "goal node start -d %s -p %s" % (self.get_data_dir(self.my_id), ";".join(addresses))
 
         self._logger.info("Starting Algorand node with command: %s", cmd)
-        self.node_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        self.node_process = subprocess.Popen(cmd.split(" "))
 
         kmd_cmd = "goal kmd start -d %s" % self.get_data_dir(self.my_id)
-        self.kmd_process = subprocess.Popen([kmd_cmd], shell=True, preexec_fn=os.setsid)
+        self.kmd_process = subprocess.Popen(kmd_cmd.split(" "))
 
     @experiment_callback
     def start_client(self):
@@ -254,13 +253,5 @@ class AlgorandModule(BlockchainModule):
 
     @experiment_callback
     def stop_algorand(self):
-        self._logger.info("Stopping Algorand...")
-        if self.node_process:
-            os.killpg(os.getpgid(self.node_process.pid), signal.SIGTERM)
-        if self.kmd_process:
-            os.killpg(os.getpgid(self.kmd_process.pid), signal.SIGTERM)
-
-    @experiment_callback
-    def stop(self):
-        loop = get_event_loop()
-        loop.stop()
+        os.system("pkill -f algod")
+        os.system("pkill -f kmd")
