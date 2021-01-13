@@ -229,7 +229,7 @@ class AlgorandModule(BlockchainModule):
         host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id)
         response = requests.get("http://%s:%d/metrics" % (host, 18500 + validator_peer_id),
                                 headers={"X-Algo-API-Token": rest_token})
-        print(response.text)
+        print(str(response))
 
         response = requests.get("http://%s:%d/v2/status" % (host, 18500 + validator_peer_id),
                                 headers={"X-Algo-API-Token": rest_token})

@@ -40,6 +40,13 @@ class BlockchainTransactionsParser(StatisticsParser):
         self.avg_start_time = int(avg_start_time / num_files) if num_files > 0 else -1
 
     def combine_bandwidth_stats(self):
+        with open('total_bandwidth.csv', 'w') as b_f:
+            b_f.write('total_up,total_down,peer_nr\n')
+            for peer_nr, filename, _ in self.yield_files('bandwidth.txt'):
+                with open(filename, 'r') as annotation_file:
+                    line = annotation_file.read()
+                    b_f.write('%s,%d\n' % (line, int(peer_nr)))
+
         with open("system_bandwidth.csv", "w") as b_f:
             b_f.write("src,dst,count,peer_nr\n")
             for peer_nr, filename, _ in self.yield_files('system_bandwidth.csv'):
