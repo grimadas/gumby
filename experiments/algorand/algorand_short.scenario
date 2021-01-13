@@ -3,16 +3,16 @@
 &module experiments.algorand.algorand_module.AlgorandModule
 &module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
 
+@0:1 start_traffic_monitor
 @0:1 init_config
-@0:5 start_traffic_monitor
 @0:5 start_algorand_node {1}
 @0:6 start_algorand_node {2-1000}
 @0:80 start_client
 @0:90 prepare_client
 @0:100 start_creating_transactions
 @0:110 stop_creating_transactions
+@0:139 stop_traffic_monitor
 @0:140 write_info
 @0:140 print_status
-@0:140 stop_traffic_monitor
 @0:145 stop_system
 @0:150 stop
