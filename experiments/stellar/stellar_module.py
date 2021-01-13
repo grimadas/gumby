@@ -203,6 +203,9 @@ ADDRESS="%s:%d"
         out_file = open("stellar.out", "w")
         self.validator_process = subprocess.Popen(cmd.split(" "), stdout=out_file, stderr=out_file)
 
+        with open('pid.txt', 'w') as p_f:
+            p_f.write(str(self.validator_process.pid))
+
     @experiment_callback
     def start_horizon(self):
         """

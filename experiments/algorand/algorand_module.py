@@ -132,6 +132,9 @@ class AlgorandModule(BlockchainModule):
         kmd_cmd = "goal kmd start -d %s" % self.get_data_dir(self.my_id)
         self.kmd_process = subprocess.Popen(kmd_cmd.split(" "))
 
+        with open('pid.txt', 'w') as p_f:
+            p_f.write(str(self.node_process.pid))
+
     @experiment_callback
     def start_client(self):
         # Find out to which validator we should connect

@@ -117,6 +117,9 @@ class BitsharesModule(BlockchainModule):
         bitshares_out_file = open("bitshares_output.log", "w")
         self.bs_process = subprocess.Popen(cmd.split(" "), stdout=bitshares_out_file)
 
+        with open('pid.txt', 'w') as p_f:
+            p_f.write(str(self.bs_process.pid))
+
     @experiment_callback
     def start_cli_wallet(self):
         if self.is_client():

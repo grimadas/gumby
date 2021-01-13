@@ -125,6 +125,9 @@ class LibraModule(BlockchainModule):
         out_file = open("diem_output.log", "w")
         self.libra_validator_process = subprocess.Popen(cmd.split(" "), stdout=out_file, stderr=out_file)
 
+        with open('pid.txt', 'w') as p_f:
+            p_f.write(str(self.libra_validator_process.pid))
+
     @experiment_callback
     async def start_libra_cli(self):
         # Get the faucet host

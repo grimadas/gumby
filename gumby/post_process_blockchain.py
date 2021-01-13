@@ -47,6 +47,16 @@ class BlockchainTransactionsParser(StatisticsParser):
                     line = annotation_file.read()
                     b_f.write('%s,%d\n' % (line, int(peer_nr)))
 
+        # combine pids
+        with open('sytem_pids.csv', 'w') as b_f:
+            b_f.write('pid,peer_nr\n')
+            for peer_nr, filename, _ in self.yield_files('pid.txt'):
+                with open(filename, 'r') as annotation_file:
+                    line = annotation_file.read()
+                    b_f.write('%s,%d\n' % (line, int(peer_nr)))
+
+
+
         with open("system_bandwidth.csv", "w") as b_f:
             b_f.write("src,dst,count,peer_nr\n")
             for peer_nr, filename, _ in self.yield_files('system_bandwidth.csv'):

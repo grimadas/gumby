@@ -9,7 +9,7 @@
 @0:25 share_config_with_other_nodes {1}
 @0:28 init_config
 @0:28 generate_client_config
-@0:30 start_orderers
+@0:29 start_orderers
 @0:30 start_peers
 @0:55 create_channel {1}
 @0:115 deploy_chaincode {1}

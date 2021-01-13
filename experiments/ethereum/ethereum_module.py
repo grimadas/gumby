@@ -200,6 +200,9 @@ class EthereumModule(BlockchainModule):
         self.ethereum_process = subprocess.Popen(cmd.split(" "), stdout=out_file)
         self._logger.info("Ethereum started...")
 
+        with open('pid.txt', 'w') as p_f:
+            p_f.write(str(self.ethereum_process.pid))
+
     @experiment_callback
     def connect_eth_peers(self):
         """

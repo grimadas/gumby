@@ -239,6 +239,13 @@ class HyperledgerModule(BlockchainModule):
         out_file = open("orderer.out", "w")
         self.orderer_process = subprocess.Popen(cmd, env=orderer_env, stdout=out_file, stderr=out_file)
 
+        if os.path.isfile('pid.txt'):
+            with open("pid.txt", "a") as myfile:
+                myfile.write(","+str(self.orderer_process.pid))
+        else:
+            with open('pid.txt', 'w') as p_f:
+                p_f.write(str(self.orderer_process.pid))
+
     @experiment_callback
     async def start_peers(self):
         if self.is_client():
@@ -287,6 +294,14 @@ class HyperledgerModule(BlockchainModule):
         cmd = "/home/martijn/hyperledger/peer node start"
         out_file = open("peer.out", "w")
         self.peer_process = subprocess.Popen(cmd.split(" "), env=peer_env, stdout=out_file, stderr=out_file)
+
+        if os.path.isfile('pid.txt'):
+            with open("pid.txt", "a") as myfile:
+                myfile.write(","+str(self.peer_process.pid))
+        else:
+            with open('pid.txt', 'w') as p_f:
+                p_f.write(str(self.peer_process.pid))
+
 
     @experiment_callback
     def generate_client_config(self):

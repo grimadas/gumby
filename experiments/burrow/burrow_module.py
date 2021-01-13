@@ -181,6 +181,10 @@ class BurrowModule(BlockchainModule):
 
         self._logger.info("Burrow started...")
 
+        with open('pid.txt', 'w') as p_f:
+            p_f.write(str(self.burrow_process.pid))
+
+
     # @experiment_callback
     # def deploy_contract(self):
     #     print("Deploying contract...")

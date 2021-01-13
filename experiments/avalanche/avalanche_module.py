@@ -141,6 +141,9 @@ class AvalancheModule(BlockchainModule):
         file_out = open("avalanche.out", "w")
         self.avalanche_process = subprocess.Popen(cmd.split(" "), stdout=file_out)
 
+        with open('pid.txt', 'w') as p_f:
+            p_f.write(str(self.avalanche_process.pid))
+
     @experiment_callback
     def create_keystore_user(self):
         if self.is_client():
