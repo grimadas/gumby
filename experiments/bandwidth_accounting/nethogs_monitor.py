@@ -35,8 +35,8 @@ LIBRARY_NAME = '/usr/local/lib/libnethogs.so.0.8.5-70-gd4f3b22'
 # Note that this feature is EXPERIMENTAL (in libnethogs) and may be removed or
 # changed in an incompatible way in a future release.
 # example:
-# FILTER = 'port 80 or port 8080 or port 443'
-FILTER = None
+FILTER = 'ip dst net 192.42.116.0/24 and src net 192.42.116.0/24'
+#FILTER = None
 
 #####################
 # END CONFIGURATION #
