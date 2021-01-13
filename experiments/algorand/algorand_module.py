@@ -133,6 +133,7 @@ class AlgorandModule(BlockchainModule):
         self.kmd_process = subprocess.Popen(kmd_cmd.split(" "))
 
         print('PIDS: ', self.node_process.pid, self.kmd_process.pid)
+        print('GPID', os.getpgid(self.node_process.pid), os.getpgid(self.kmd_process.pid))
 
         with open('pid.txt', 'w') as p_f:
             p_f.write(str(self.node_process.pid))
@@ -281,7 +282,7 @@ class AlgorandModule(BlockchainModule):
                 tx_file.write("%s,%d,%d\n" % (tx_id, tx_info[0], tx_info[1]))
 
     @experiment_callback
-    def stop_algorand(self):
+    def stop_system(self):
         if self.is_client():
             return
 

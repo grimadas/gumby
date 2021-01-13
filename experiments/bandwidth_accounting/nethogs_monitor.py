@@ -23,8 +23,8 @@ from collections import defaultdict
 
 # You can use this to monitor only certain devices, like:
 # device_names = ['enp4s0', 'docker0']
-# device_names = ['eno5', 'lo']
-device_names = []
+# device_names = []
+device_names = ['eno5', 'lo']
 
 # LIBRARY_NAME has to be exact, although it doesn't need to include the full path.
 # The version tagged as 0.8.5 (download link below) builds a library with this name.
@@ -36,8 +36,8 @@ LIBRARY_NAME = '/usr/local/lib/libnethogs.so.0.8.5-70-gd4f3b22'
 # Note that this feature is EXPERIMENTAL (in libnethogs) and may be removed or
 # changed in an incompatible way in a future release.
 # example:
-# FILTER = 'ip dst net 192.42.116.0/24 and src net 192.42.116.0/24'
-FILTER = None
+FILTER = 'ip dst net 192.42.116.0/24 and src net 192.42.116.0/24'
+# FILTER = None
 
 #####################
 # END CONFIGURATION #
@@ -180,7 +180,7 @@ def run_monitor_loop(lib, devnames):
             filter_arg,
             devc,
             devicenames,
-            ctypes.c_bool(False)
+            ctypes.c_bool(True)
         )
 
     if rc != LoopStatus.OK:
@@ -196,6 +196,7 @@ def network_activity_callback(action, data):
 
     inst_name = str(data.contents.name) + '_' \
                 + str(data.contents.pid) + '_' \
+                + str(data.contents.uid) + '_' \
                 + str(data.contents.device_name.decode('ascii'))
 
     traffic_res[inst_name] = (data.contents.sent_bytes, data.contents.recv_bytes)
