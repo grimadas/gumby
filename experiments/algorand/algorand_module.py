@@ -132,6 +132,8 @@ class AlgorandModule(BlockchainModule):
         kmd_cmd = "goal kmd start -d %s" % self.get_data_dir(self.my_id)
         self.kmd_process = subprocess.Popen(kmd_cmd.split(" "))
 
+        print('PIDS: ', self.node_process.pid, self.kmd_process.pid)
+
         with open('pid.txt', 'w') as p_f:
             p_f.write(str(self.node_process.pid))
 
