@@ -16,5 +16,5 @@
 @0:130 start_creating_transactions
 @0:250 stop_creating_transactions
 @0:270 parse_ledgers {1}
-@0:270 write_submit_times
+@0:270 write_stats
 @0:310 stop

@@ -1,5 +1,6 @@
 import os
 import random
+import shlex
 import shutil
 import signal
 
@@ -18,7 +19,7 @@ from stellar_sdk.exceptions import NotFoundError
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
-from gumby.modules.experiment_module import static_module
+from gumby.modules.experiment_module import static_module, ExperimentModule
 
 
 @static_module
@@ -77,8 +78,9 @@ class StellarModule(BlockchainModule):
             return
 
         os.environ["PGDATA"] = self.db_path
-        cmd = "/usr/lib/postgresql/11/bin/pg_ctl start -o \"-N 300\""
-        self.postgres_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        cmd = "/usr/lib/postgresql/11/bin/pg_ctl start"
+        out_file = open("postgres.out", "w")
+        self.postgres_process = subprocess.Popen(cmd.split(" "), stdout=out_file, stderr=out_file)
 
     @experiment_callback
     def setup_db(self):
@@ -192,8 +194,9 @@ ADDRESS="%s:%d"
 
         await sleep(random.random() * 3)
 
-        cmd = "/home/martijn/stellar-core/stellar-core run > stellar.out 2>&1"
-        self.validator_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        cmd = "/home/martijn/stellar-core/stellar-core run"
+        out_file = open("stellar.out", "w")
+        self.validator_process = subprocess.Popen(cmd.split(" "), stdout=out_file, stderr=out_file)
 
     @experiment_callback
     def start_horizon(self):
@@ -223,8 +226,9 @@ ADDRESS="%s:%d"
         os.system(cmd)
 
         # Now start Horizon
-        cmd = '/home/martijn/gocode/bin/horizon %s > horizon.out 2>&1' % args
-        self.horizon_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        cmd = '/home/martijn/gocode/bin/horizon %s' % args
+        out_file = open("horizon.out", "w")
+        self.horizon_process = subprocess.Popen(shlex.split(cmd), stdout=out_file, stderr=out_file)
 
     @experiment_callback
     async def upgrade_tx_set_size(self):
@@ -387,8 +391,17 @@ ADDRESS="%s:%d"
         self.current_account_nr = (self.current_account_nr + 1) % self.num_accounts_per_client
 
     @experiment_callback
-    def write_submit_times(self):
+    def write_stats(self):
         if not self.is_client():
+            self._logger.info("Writing disk usage...")
+            # Write the disk usage of the data directory
+            cmd = "/usr/lib/postgresql/11/bin/psql postgres -c \"SELECT pg_database_size('stellar_%d_db')\" -t" % self.my_id
+            proc = subprocess.Popen([cmd], stdout=subprocess.PIPE, shell=True)
+            out, _ = proc.communicate()
+            disk_usage = int(out.strip())
+            with open("disk_usage.txt", "w") as disk_out_file:
+                disk_out_file.write("%d" % disk_usage)
+
             return
 
         with open("tx_submit_times.txt", "w") as tx_submit_times_file:
@@ -433,13 +446,13 @@ ADDRESS="%s:%d"
         self._logger.info("Stopping Stellar...")
         if self.postgres_process:
             self._logger.info("Killing postgres")
-            os.killpg(os.getpgid(self.postgres_process.pid), signal.SIGTERM)
+            os.system("pkill -f postgres")
         if self.validator_process:
             self._logger.info("Killing validator")
-            os.killpg(os.getpgid(self.validator_process.pid), signal.SIGTERM)
+            self.validator_process.terminate()
         if self.horizon_process:
             self._logger.info("Killing horizon")
-            os.killpg(os.getpgid(self.horizon_process.pid), signal.SIGTERM)
+            self.horizon_process.terminate()
 
         loop = get_event_loop()
         loop.stop()
