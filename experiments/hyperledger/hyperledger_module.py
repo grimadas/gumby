@@ -2,7 +2,6 @@ import json
 import os
 import random
 import shutil
-import signal
 import subprocess
 import time
 from asyncio import sleep, get_event_loop, ensure_future
@@ -12,7 +11,7 @@ from ruamel.yaml.comments import CommentedMap
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
-from gumby.modules.experiment_module import static_module
+from gumby.modules.experiment_module import static_module, ExperimentModule
 from gumby.util import run_task
 
 from hfc.fabric import Client
@@ -235,8 +234,9 @@ class HyperledgerModule(BlockchainModule):
         await sleep(random.random() * 10)
 
         # Start the orderer
-        cmd = "/home/martijn/hyperledger/orderer > orderer.out 2>&1"
-        self.orderer_process = subprocess.Popen([cmd], shell=True, env=orderer_env, preexec_fn=os.setsid)
+        cmd = "/home/martijn/hyperledger/orderer"
+        out_file = open("orderer.out", "w")
+        self.orderer_process = subprocess.Popen(cmd, env=orderer_env, stdout=out_file, stderr=out_file)
 
     @experiment_callback
     async def start_peers(self):
@@ -283,8 +283,9 @@ class HyperledgerModule(BlockchainModule):
         await sleep(random.random() * 10)
 
         # Start the peer
-        cmd = "/home/martijn/hyperledger/peer node start > peer.out 2>&1"
-        self.peer_process = subprocess.Popen([cmd], shell=True, env=peer_env, preexec_fn=os.setsid)
+        cmd = "/home/martijn/hyperledger/peer node start"
+        out_file = open("peer.out", "w")
+        self.peer_process = subprocess.Popen(cmd.split(" "), env=peer_env, stdout=out_file, stderr=out_file)
 
     @experiment_callback
     def generate_client_config(self):
@@ -448,14 +449,14 @@ class HyperledgerModule(BlockchainModule):
         org1_admin = self.fabric_client.get_user(org_name='org1.example.com', name='Admin')
 
         self._logger.info("Starting monitor...")
-        cmd = "cd /home/martijn/fabric-examples/fabric-cli/cmd/fabric-cli/ && /home/martijn/go/bin/go run " \
+        cmd = "/home/martijn/go/bin/go run " \
               "/home/martijn/fabric-examples/fabric-cli/cmd/fabric-cli/fabric-cli.go event listenblock " \
               "--cid mychannel --peer localhost:8001 " \
-              "--config /home/martijn/fabric-examples/fabric-cli/cmd/fabric-cli/config.yaml > %s" \
-              % os.path.join(os.getcwd(), "transactions.txt")
+              "--config /home/martijn/fabric-examples/fabric-cli/cmd/fabric-cli/config.yaml"
+        out_file = open("transactions.txt", "w")
         my_env = os.environ.copy()
         my_env["GOPATH"] = "/home/martijn/gocode"
-        self.monitor_process = subprocess.Popen(cmd, env=my_env, shell=True, preexec_fn=os.setsid)
+        self.monitor_process = subprocess.Popen(cmd.split(" "), env=my_env, stdout=out_file, cwd="/home/martijn/fabric-examples/fabric-cli/cmd/fabric-cli/")
 
         async def get_latest_block_num():
             self._logger.info("Getting latest block nr...")
@@ -514,7 +515,8 @@ class HyperledgerModule(BlockchainModule):
         if self.monitor_lc:
             self.monitor_lc.cancel()
         if self.monitor_process:
-            os.killpg(os.getpgid(self.monitor_process.pid), signal.SIGTERM)
+            self.monitor_process.terminate()
+            os.system("pkill -f listenblock")  # To kill the spawned Go run subprocess
 
     @experiment_callback
     def start_client(self):
@@ -550,6 +552,11 @@ class HyperledgerModule(BlockchainModule):
     @experiment_callback
     def write_stats(self):
         if not self.is_client():
+            # Write the disk usage of the data directory
+            data_dir = os.path.join("/tmp", "hyperledger_data", "%d" % self.my_id)
+            with open("disk_usage.txt", "w") as disk_out_file:
+                dir_size = ExperimentModule.get_dir_size(data_dir)
+                disk_out_file.write("%d" % dir_size)
             return
 
         # Write the transaction info away
@@ -561,9 +568,9 @@ class HyperledgerModule(BlockchainModule):
     def stop(self):
         print("Stopping Hyperledger Fabric...")
         if self.orderer_process:
-            os.killpg(os.getpgid(self.orderer_process.pid), signal.SIGTERM)
+            self.orderer_process.terminate()
         if self.peer_process:
-            os.killpg(os.getpgid(self.peer_process.pid), signal.SIGTERM)
+            self.peer_process.terminate()
 
         loop = get_event_loop()
         loop.stop()
