@@ -1,25 +1,18 @@
-import decimal
 import json
 import os
-import re
-import shutil
-import signal
 import subprocess
-import sys
 import time
 from asyncio import sleep, get_event_loop
 
 import aiohttp
-from aiohttp import web
 
-import pexpect
 from diem import LocalAccount, jsonrpc, stdlib, utils, testnet, diem_types, chain_ids
 
 from ruamel.yaml import YAML
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
-from gumby.modules.experiment_module import static_module
+from gumby.modules.experiment_module import static_module, ExperimentModule
 from gumby.util import run_task
 
 
@@ -128,8 +121,9 @@ class LibraModule(BlockchainModule):
         libra_exec_path = os.path.join(self.libra_path, "target", "release", "diem-node")
         config_path = os.path.join(os.getcwd(), "node.yaml")
 
-        cmd = '%s -f %s > %s 2>&1' % (libra_exec_path, config_path, os.path.join(os.getcwd(), 'diem_output.log'))
-        self.libra_validator_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        cmd = '%s -f %s' % (libra_exec_path, config_path)
+        out_file = open("diem_output.log", "w")
+        self.libra_validator_process = subprocess.Popen(cmd.split(" "), stdout=out_file, stderr=out_file)
 
     @experiment_callback
     async def start_libra_cli(self):
@@ -140,8 +134,9 @@ class LibraModule(BlockchainModule):
             self._logger.info("Starting faucet!")
             # Start the minting service
             mint_key_path = os.path.join("/tmp", "diem_data_%d" % self.num_validators, "mint.key")
-            cmd = "%s/target/release/diem-faucet -m %s -s http://localhost:%d -c 4 -p 8000 -a 0.0.0.0 > faucet.out 2>&1" % (self.libra_path, mint_key_path, 12000 + self.my_id)
-            self.faucet_client = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+            out_file = open("faucet.out", "w")
+            cmd = "%s/target/release/diem-faucet -m %s -s http://localhost:%d -c 4 -p 8000 -a 0.0.0.0" % (self.libra_path, mint_key_path, 12000 + self.my_id)
+            self.faucet_client = subprocess.Popen(cmd.split(" "), stdout=out_file, stderr=out_file)
         if self.is_client():
             validator_peer_id = (self.my_id - 1) % self.num_validators
             validator_host, _ = self.experiment.get_peer_ip_port_by_id(validator_peer_id + 1)
@@ -246,6 +241,12 @@ class LibraModule(BlockchainModule):
     @experiment_callback
     def write_stats(self):
         if not self.is_client():
+            # Write the disk usage of the data directory
+            with open("disk_usage.txt", "w") as disk_out_file:
+                data_dir = os.path.join("/tmp", "diem_data_%d" % self.num_validators, "%d" % (self.my_id - 1))
+                dir_size = ExperimentModule.get_dir_size(data_dir)
+                disk_out_file.write("%d" % dir_size)
+
             return
 
         # Write transaction data
@@ -262,9 +263,9 @@ class LibraModule(BlockchainModule):
     async def stop(self):
         print("Stopping Diem...")
         if self.libra_validator_process:
-            os.killpg(os.getpgid(self.libra_validator_process.pid), signal.SIGTERM)
+            self.libra_validator_process.terminate()
         if self.faucet_client:
-            os.killpg(os.getpgid(self.faucet_client.pid), signal.SIGTERM)
+            self.faucet_client.terminate()
 
         loop = get_event_loop()
         loop.stop()
