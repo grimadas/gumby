@@ -17,7 +17,7 @@ from web3 import Web3
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
-from gumby.modules.experiment_module import static_module
+from gumby.modules.experiment_module import static_module, ExperimentModule
 from gumby.util import run_task
 
 
@@ -177,15 +177,16 @@ class EthereumModule(BlockchainModule):
         host, _ = self.experiment.get_peer_ip_port_by_id(str(self.experiment.my_id))
         cmd = "%s --datadir data --allow-insecure-unlock --metrics --pprof --pprofport %d --rpc --rpcport %d " \
               "--rpcaddr 0.0.0.0 " \
-              "--rpcapi=\"eth,net,web3,personal,admin,debug,txpool\" --ethash.dagdir %s " \
+              "--rpcapi=eth,net,web3,personal,admin,debug,txpool --ethash.dagdir %s " \
               "--port %d --networkid %d --nat extip:%s --mine --miner.threads=1 --maxpeers 500 " \
               "--netrestrict 192.42.116.0/24 --txpool.globalslots=20000 " \
-              "--txpool.globalqueue=20000 > ethereum.out 2>&1" % \
+              "--txpool.globalqueue=20000" % \
               (geth_bin_path, pprof_port, rpc_port, ethash_dir, port, self.network_id, host)
 
         self._logger.info("Ethereum start command: %s", cmd)
 
-        self.ethereum_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        out_file = open("ethereum.out", "w")
+        self.ethereum_process = subprocess.Popen(cmd.split(" "), stdout=out_file)
         self._logger.info("Ethereum started...")
 
     @experiment_callback
@@ -361,6 +362,11 @@ class EthereumModule(BlockchainModule):
 
             return
 
+        # Write disk usage
+        with open("disk_usage.txt", "w") as disk_out_file:
+            dir_size = ExperimentModule.get_dir_size("data")
+            disk_out_file.write("%d" % dir_size)
+
         # Write confirmed transactions
         with open("confirmed_txs.txt", "w") as tx_file:
             for tx_id, confirm_time in self.confirmed_transactions.items():
@@ -410,7 +416,7 @@ class EthereumModule(BlockchainModule):
     def stop_ethereum(self):
         if self.ethereum_process:
             self._logger.info("Stopping Ethereum...")
-            os.killpg(os.getpgid(self.ethereum_process.pid), signal.SIGTERM)
+            self.ethereum_process.terminate()
 
         loop = get_event_loop()
         loop.stop()
