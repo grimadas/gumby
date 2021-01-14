@@ -15,7 +15,7 @@ import requests
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
-from gumby.modules.experiment_module import static_module
+from gumby.modules.experiment_module import static_module, ExperimentModule
 
 
 @static_module
@@ -134,11 +134,12 @@ class AvalancheModule(BlockchainModule):
               "--http-host= --http-port=%s --staking-port=%s --db-dir=db/node%d --staking-enabled=true " \
               "--network-id=local --bootstrap-ips=%s --bootstrap-ids=%s conn-meter-max-conns=0 --max-non-staker-pending-msgs=1000 " \
               "--staking-tls-cert-file=/home/martijn/avalanche/staking/local/staker%d.crt --plugin-dir=/home/martijn/avalanche/plugins " \
-              "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key > avalanche.out" % \
+              "--staking-tls-key-file=/home/martijn/avalanche/staking/local/staker%d.key" % \
               (my_host, snow_sample_size, snow_quorum_size, http_port, staking_port, self.my_id, ",".join(bootstrap_ips), ",".join(bootstrap_ids), self.my_id, self.my_id)
         self._logger.info("Starting Avalanche with command: %s...", cmd)
 
-        self.avalanche_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        file_out = open("avalanche.out", "w")
+        self.avalanche_process = subprocess.Popen(cmd.split(" "), stdout=file_out)
 
     @experiment_callback
     def create_keystore_user(self):
@@ -387,6 +388,11 @@ class AvalancheModule(BlockchainModule):
 
             return
 
+        # Write the disk usage of the data directory
+        with open("disk_usage.txt", "w") as disk_out_file:
+            dir_size = ExperimentModule.get_dir_size("db")
+            disk_out_file.write("%d" % dir_size)
+
         # Write the addresses managed by this user
         payload = {
             "method": "platform.listAddresses",
@@ -434,17 +440,7 @@ class AvalancheModule(BlockchainModule):
 
     @experiment_callback
     def stop(self):
-        def kill(proc_pid):
-            process = psutil.Process(proc_pid)
-            for proc in process.children(recursive=True):
-                proc.kill()
-            process.kill()
-
         if self.avalanche_process:
-            self._logger.info("Stopping Avalanche...")
-            kill(self.avalanche_process.pid)
-
-            # Since Avalanche does not obey my commands...
             os.system("pkill -f avalanchego")
             os.system("pkill -f evm")
 
