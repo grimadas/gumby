@@ -14,7 +14,7 @@ from grapheneapi.grapheneapi import GrapheneAPI
 
 from gumby.experiment import experiment_callback
 from gumby.modules.blockchain_module import BlockchainModule
-from gumby.modules.experiment_module import static_module
+from gumby.modules.experiment_module import static_module, ExperimentModule
 from gumby.util import run_task
 
 
@@ -32,7 +32,7 @@ class BitsharesModule(BlockchainModule):
         self.trade_lc = None
         self.username = None
         self.bs_process = None
-        self.bs_process_lc = None
+        self.wallet_process = None
         self.create_ask = True
         self.orders_info = []  # Keeps track of tuples: (order_creation_time, signature)
         self.tx_info = []
@@ -106,26 +106,16 @@ class BitsharesModule(BlockchainModule):
         else:
             run_task(self.start_bitshares_process, delay=random.random() * 10)
 
-        self.bs_process_lc = run_task(self.check_bs_process, interval=12, delay=12)
-
     def on_id_received(self):
         super(BitsharesModule, self).on_id_received()
         self.create_ask = (self.my_id % 2 == 0)
 
-    def check_bs_process(self):
-        """
-        Check whether the main Bitshares process is alive. If it's not, restart it
-        """
-        if self.bs_process.poll():
-            print("Bitshares process died - starting again!")
-            self.start_bitshares_process()
-
     def start_bitshares_process(self):
         bitshares_exec = os.path.join(self.devnet_dir, "witness_node")
         genesis_path = os.path.join(self.devnet_dir, "genesis", "my-genesis.json")
-        cmd = '%s --genesis-json=%s --data-dir data --partial-operations true > %s 2>&1' \
-              % (bitshares_exec, genesis_path, 'bitshares_output.log')
-        self.bs_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setsid)
+        cmd = '%s --genesis-json=%s --data-dir data --partial-operations true' % (bitshares_exec, genesis_path)
+        bitshares_out_file = open("bitshares_output.log", "w")
+        self.bs_process = subprocess.Popen(cmd.split(" "), stdout=bitshares_out_file)
 
     @experiment_callback
     def start_cli_wallet(self):
@@ -143,11 +133,11 @@ class BitsharesModule(BlockchainModule):
 
         cli_wallet_exec = os.path.join(self.devnet_dir, "cli_wallet")
         cmd = '%s --wallet-file=my-wallet.json --chain-id %s --server-rpc-endpoint=ws://127.0.0.1:%d ' \
-              '--server-rpc-user=%s --server-rpc-password=%s --rpc-endpoint=0.0.0.0:%d --daemon > %s 2>&1' \
+              '--server-rpc-user=%s --server-rpc-password=%s --rpc-endpoint=0.0.0.0:%d --daemon' \
               % (cli_wallet_exec, chain_id, server_rpc_port, self.wallet_rpc_user,
-                 self.wallet_rpc_password, wallet_rpc_port, 'bitshares_wallet_output.log')
-        subprocess.Popen([cmd], shell=True)
-        self.bs_process_lc.cancel()
+                 self.wallet_rpc_password, wallet_rpc_port)
+        wallet_out_file = open("bitshares_wallet_output.log", "w")
+        self.wallet_process = subprocess.Popen(cmd.split(" "), stdout=wallet_out_file)
 
     @experiment_callback
     def unlock_cli_wallet(self):
@@ -273,6 +263,12 @@ class BitsharesModule(BlockchainModule):
     def write_stats(self):
         self._logger.info("Writing BitShares statistics...")
 
+        if not self.is_client():
+            # Write the disk usage of the data directory
+            with open("disk_usage.txt", "w") as disk_out_file:
+                dir_size = ExperimentModule.get_dir_size("data")
+                disk_out_file.write("%d" % dir_size)
+
         # Write a map with tx info
         with open("tx_submit_times.txt", "w") as created_tx_files:
             for order_tup in self.tx_info:
@@ -316,8 +312,9 @@ class BitsharesModule(BlockchainModule):
     @experiment_callback
     def stop(self):
         print("Stopping BitShares...")
-        if self.bs_process:
-            os.killpg(os.getpgid(self.bs_process.pid), signal.SIGKILL)
+        os.system("pkill -f witness_node")
+        os.system("pkill -f cli_wallet")
+
         if self.dump_blockchain_lc:
             self.dump_blockchain_lc.cancel()
 
