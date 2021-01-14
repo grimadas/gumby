@@ -312,8 +312,10 @@ class BitsharesModule(BlockchainModule):
     @experiment_callback
     def stop(self):
         print("Stopping BitShares...")
-        os.system("pkill -f witness_node")
-        os.system("pkill -f cli_wallet")
+        if self.bs_process:
+            self.bs_process.terminate()
+        if self.wallet_process:
+            self.wallet_process.terminate()
 
         if self.dump_blockchain_lc:
             self.dump_blockchain_lc.cancel()
