@@ -123,6 +123,8 @@ class BlockchainTransactionsParser(StatisticsParser):
         submitted_count = 0
         confirmed_count = 0
         self.cumulative_stats = [(0, 0, 0)]
+        if len(submit_times) == 0 or len(confirm_times) == 0:
+            return
 
         if not submit_times or not confirm_times:
             return
