@@ -55,15 +55,17 @@ class TrafficMonitor(ExperimentModule):
 
     @experiment_callback
     def start_traffic_monitor(self):
-        self.counter = psutil.net_io_counters()
+        if self.is_responsible_validator():
+            self.counter = psutil.net_io_counters()
 
     @experiment_callback
     def stop_traffic_monitor(self):
-        v = psutil.net_io_counters()
+        if self.is_responsible_validator():
+            v = psutil.net_io_counters()
 
-        with open("net_io.txt", "w") as bandwidth_file:
-            bandwidth_file.write("%d,%d" % (v.bytes_sent - self.counter.bytes_sent,
-                                            v.bytes_recv - self.counter.bytes_recv))
+            with open("net_io.txt", "w") as bandwidth_file:
+                bandwidth_file.write("%d,%d" % (v.bytes_sent - self.counter.bytes_sent,
+                                                v.bytes_recv - self.counter.bytes_recv))
 
     @experiment_callback
     def stop_detailed_monitor(self):
