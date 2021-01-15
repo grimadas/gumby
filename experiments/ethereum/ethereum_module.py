@@ -396,7 +396,7 @@ class EthereumModule(BlockchainModule):
         total_up = metrics_json["p2p/egress.count"]
         total_down = metrics_json["p2p/ingress.count"]
         with open("bandwidth.txt", "w") as bandwidth_file:
-            bandwidth_file.write("%d,%d,%d" % (total_up, total_down, total_up + total_down))
+            bandwidth_file.write("%d,%d" % (total_up, total_down))
 
         url = 'http://localhost:%d' % (14000 + self.experiment.my_id)
         w3 = Web3(Web3.HTTPProvider(url))

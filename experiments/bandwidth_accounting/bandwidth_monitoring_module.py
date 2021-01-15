@@ -1,6 +1,7 @@
 import os
 import signal
 import subprocess
+import psutil
 
 from gumby.experiment import experiment_callback
 from gumby.modules.experiment_module import ExperimentModule, static_module
@@ -15,6 +16,8 @@ class TrafficMonitor(ExperimentModule):
 
         self.num_validators = int(os.environ["NUM_VALIDATORS"])
         self.num_clients = int(os.environ["NUM_CLIENTS"])
+
+        self.counter = None
 
     def is_client(self):
         return self.my_id > self.num_validators
@@ -38,7 +41,7 @@ class TrafficMonitor(ExperimentModule):
         return is_responsible
 
     @experiment_callback
-    def start_traffic_monitor(self):
+    def start_detailed_monitor(self):
         if self.is_responsible_validator():
             self._logger.info("Starting bandwidth monitoring")
             path = os.path.join(os.environ.get('PROJECT_DIR'),
@@ -51,7 +54,19 @@ class TrafficMonitor(ExperimentModule):
             self.run_process = subprocess.Popen([cmd], shell=True, preexec_fn=os.setpgrp)
 
     @experiment_callback
+    def start_traffic_monitor(self):
+        self.counter = psutil.net_io_counters()
+
+    @experiment_callback
     def stop_traffic_monitor(self):
+        v = psutil.net_io_counters()
+
+        with open("net_io.txt", "w") as bandwidth_file:
+            bandwidth_file.write("%d,%d" % (v.bytes_sent - self.counter.bytes_sent,
+                                            v.bytes_recv - self.counter.bytes_recv))
+
+    @experiment_callback
+    def stop_detailed_monitor(self):
         if self.run_process:
             self._logger.info("Stopping bandwidth monitoring")
             # Get the process id

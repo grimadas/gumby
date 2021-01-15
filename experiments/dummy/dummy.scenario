@@ -3,6 +3,6 @@
 &module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
 
 @0:1 write_peer_id
-@0:1 start_monitor
-@0:4 stop_monitor
-@0:5 stop
+@0:1 start_traffic_monitor
+@0:121 stop_traffic_monitor
+@0:125 stop
