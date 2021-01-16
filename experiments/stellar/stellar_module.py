@@ -135,7 +135,12 @@ class StellarModule(BlockchainModule):
                 keys.append((seed, pub_key))
 
         # Make the validators info
-        k = int(os.getenv('QUORUM', 11))
+        quor_tar = self.num_validators // 2 + 1
+        vars = os.getenv('QUORUM')
+        if not vars:
+            k = int(quor_tar)
+        else:
+            k = int(vars)
         full_list = list(range(self.num_validators))
         quorum = random.sample(full_list, min(k, len(full_list)))
 
