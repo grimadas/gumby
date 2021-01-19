@@ -1,0 +1,27 @@
+&module gumby.modules.experiment_module.ExperimentModule
+&module gumby.modules.transactions_module.TransactionsModule
+&module experiments.stellar.stellar_module.StellarModule
+&module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
+&module experiments.bandwidth_accounting.network_challenging_module.LatencyChallenger
+
+@0:1 init_db
+@0:5 start_traffic_monitor
+@0:5 start_db
+@0:7 setup_db
+@0:8 create_db
+@0:8 init_config
+@0:9 init_validators
+@0:12 start_validators
+@0:20 start_horizon
+@0:28 upgrade_tx_set_size
+@0:60 create_accounts {1}
+@0:120 get_initial_sq_num
+@0:129 add_latency
+@0:130 start_creating_transactions
+@0:250 stop_creating_transactions
+@0:269 remove_latency
+@0:270 parse_ledgers {1}
+@0:270 write_stats
+@0:270 stop_traffic_monitor
+@0:310 stop_system
+@0:310 stop

@@ -1,0 +1,28 @@
+&module gumby.modules.experiment_module.ExperimentModule
+&module gumby.modules.transactions_module.TransactionsModule
+&module experiments.hyperledger.hyperledger_module.HyperledgerModule
+&module experiments.bandwidth_accounting.bandwidth_monitoring_module.TrafficMonitor
+&module experiments.bandwidth_accounting.network_challenging_module.LatencyChallenger
+
+@0:1 generate_config {1}
+@0:3 generate_artifacts {1}
+@0:5 start_traffic_monitor
+@0:25 share_config_with_other_nodes {1}
+@0:28 init_config
+@0:28 generate_client_config
+@0:29 start_orderers
+@0:30 start_peers
+@0:55 create_channel {1}
+@0:115 deploy_chaincode {1}
+@0:165 start_monitor {1}
+@0:165 start_client
+@0:169 add_latency
+@0:170 start_creating_transactions
+@0:290 stop_creating_transactions
+@0:329 remove_latency
+@0:320 stop_monitor {1}
+@0:325 parse_blockchain {1}
+@0:330 write_stats
+@0:330 stop_traffic_monitor
+@0:350 stop_system
+@0:350 stop
